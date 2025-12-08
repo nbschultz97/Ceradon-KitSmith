@@ -1,0 +1,132 @@
+[
+  {
+    "id": "bat_4s_5000",
+    "name": "4S 5000mAh LiPo",
+    "category": "Battery",
+    "weight_g": 520,
+    "energy_wh": 74,
+    "volume_l": 0.4,
+    "tags": ["UAS", "UGV", "field"],
+    "notes": "Standard quad battery; store at storage charge."
+  },
+  {
+    "id": "bat_98wh_brick",
+    "name": "98Wh Power Brick",
+    "category": "Battery",
+    "weight_g": 720,
+    "energy_wh": 98,
+    "volume_l": 0.65,
+    "tags": ["comms", "mission", "carry-on"],
+    "notes": "Commercial airline safe; pair with 12V adapter."
+  },
+  {
+    "id": "bat_240wh_station",
+    "name": "240Wh Field Station",
+    "category": "Battery",
+    "weight_g": 2100,
+    "energy_wh": 240,
+    "volume_l": 1.9,
+    "tags": ["recharge", "generator"],
+    "notes": "Base battery for charging handsets and tablets."
+  },
+  {
+    "id": "radio_harris_152",
+    "name": "AN/PRC-152 Handheld",
+    "category": "Radio",
+    "weight_g": 870,
+    "energy_wh": 16,
+    "volume_l": 0.7,
+    "tags": ["VHF", "UHF", "voice"],
+    "notes": "Standard handheld; include spare battery."
+  },
+  {
+    "id": "node_vantage_edge",
+    "name": "Vantage Edge Node",
+    "category": "Node",
+    "weight_g": 980,
+    "energy_wh": 45,
+    "volume_l": 1.2,
+    "tags": ["mesh", "c2", "vantage"],
+    "notes": "Edge compute for RF/Vantage kits; CSI-capable."
+  },
+  {
+    "id": "uxs_quadcopter_scout",
+    "name": "Scout Quadcopter",
+    "category": "UxS",
+    "weight_g": 2300,
+    "energy_wh": 120,
+    "volume_l": 6.0,
+    "tags": ["recon", "uas", "day"],
+    "notes": "Pack with 3x flight batteries and folding props."
+  },
+  {
+    "id": "tool_multitool",
+    "name": "Field Multitool",
+    "category": "Tool",
+    "weight_g": 220,
+    "energy_wh": null,
+    "volume_l": 0.1,
+    "tags": ["maintenance", "general"],
+    "notes": "Basic repair multitool with driver bits."
+  },
+  {
+    "id": "sustain_mre",
+    "name": "MRE (24h)",
+    "category": "Sustainment",
+    "weight_g": 500,
+    "energy_wh": null,
+    "volume_l": 1.0,
+    "tags": ["food", "24h"],
+    "notes": "One-day sustainment ration."
+  },
+  {
+    "id": "sustain_water_blader",
+    "name": "2L Water Bladder",
+    "category": "Sustainment",
+    "weight_g": 2000,
+    "energy_wh": null,
+    "volume_l": 2.0,
+    "tags": ["hydration", "24h"],
+    "notes": "Assumes filled; adjust for environment."
+  },
+  {
+    "id": "tool_tripod",
+    "name": "Carbon Tripod",
+    "category": "Tool",
+    "weight_g": 940,
+    "energy_wh": null,
+    "volume_l": 3.3,
+    "tags": ["sensors", "node"],
+    "notes": "Light tripod for antennas or sensors."
+  },
+  {
+    "id": "other_batterycharger",
+    "name": "Dual Bay Smart Charger",
+    "category": "Other",
+    "weight_g": 780,
+    "energy_wh": null,
+    "volume_l": 1.6,
+    "tags": ["charger", "shore"],
+    "notes": "Accepts 4S/6S; use with generator or wall power."
+  },
+  {
+    "id": "radio_rto_headset",
+    "name": "RTO Headset",
+    "category": "Radio",
+    "weight_g": 320,
+    "energy_wh": null,
+    "volume_l": 0.4,
+    "tags": ["voice", "handsfree"],
+    "notes": "Boom mic with hearing protection."
+  },
+  {
+    "id": "power_solar_fold",
+    "name": "80W Folding Solar",
+    "category": "Other",
+    "weight_g": 2100,
+    "energy_wh": null,
+    "volume_l": 4.0,
+    "tags": ["charging", "silent"],
+    "notes": "Silent sustainment option; pair with station battery."
+  }
+]

@@ -8,6 +8,9 @@
   --accent-strong: #6af1b7;
   --border: #262c3a;
   --shadow: 0 8px 20px rgba(0, 0, 0, 0.35);
+  --danger: #ff6b6b;
+  --warning: #f8c572;
+  --success: #6af1b7;
 }
 
 * {
@@ -47,8 +50,20 @@ a:hover {
 }
 
 .brand {
-  font-weight: 700;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
   letter-spacing: 0.5px;
+}
+
+.brand-title {
+  font-weight: 700;
+}
+
+.brand-subtitle {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.85rem;
 }
 
 .top-nav {
@@ -56,6 +71,19 @@ a:hover {
   gap: 16px;
   font-size: 0.95rem;
   color: var(--muted);
+}
+
+.nav-link {
+  background: transparent;
+  border: 1px solid var(--border);
+  color: var(--text);
+  padding: 8px 10px;
+  border-radius: 10px;
+  cursor: pointer;
+}
+
+.nav-link:hover {
+  border-color: var(--accent);
 }
 
 .layout {
@@ -73,6 +101,13 @@ a:hover {
   padding: 16px;
   box-shadow: var(--shadow);
   min-height: 200px;
+}
+
+.preset-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  justify-content: flex-end;
 }
 
 .panel-header {
@@ -108,6 +143,13 @@ a:hover {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
   gap: 12px;
+}
+
+.subsection {
+  background: rgba(255, 255, 255, 0.02);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 10px;
 }
 
 label {
@@ -183,6 +225,17 @@ legend {
   gap: 8px;
 }
 
+.sticky-filter {
+  position: sticky;
+  top: 0;
+  background: var(--panel);
+  padding: 8px;
+  border-radius: 10px;
+  border: 1px solid var(--border);
+  z-index: 2;
+  align-items: center;
+}
+
 .card-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
@@ -196,6 +249,19 @@ legend {
   padding: 12px;
   display: grid;
   gap: 6px;
+}
+
+.card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.meta-row {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
 }
 
 .card h3 {
@@ -235,6 +301,29 @@ legend {
   color: var(--muted);
 }
 
+.badge-success {
+  border-color: var(--success);
+  color: var(--success);
+}
+
+.badge-danger {
+  border-color: var(--danger);
+  color: var(--danger);
+}
+
+.badge-warning {
+  border-color: var(--warning);
+  color: var(--warning);
+}
+
+.badge-ghost {
+  background: transparent;
+}
+
+.subtle {
+  color: var(--muted);
+}
+
 .stack {
   display: flex;
   flex-direction: column;
@@ -258,9 +347,19 @@ legend {
   gap: 8px;
 }
 
+.kit-card.warning {
+  border-color: var(--danger);
+}
+
 .kit-header {
   display: flex;
   justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+}
+
+.kit-status {
+  display: flex;
   align-items: center;
   gap: 8px;
 }
@@ -287,6 +386,25 @@ legend {
   border: 1px solid var(--border);
   padding: 8px;
   border-radius: 10px;
+}
+
+.kit-stats {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+  gap: 8px;
+  background: rgba(255, 255, 255, 0.02);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 8px;
+}
+
+.stat-block {
+  display: grid;
+  gap: 4px;
+}
+
+.stat-value {
+  font-size: 1.1rem;
 }
 
 .kit-items .qty {
@@ -323,6 +441,57 @@ legend {
   padding: 12px;
   display: grid;
   gap: 6px;
+}
+
+.summary-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: 10px;
+}
+
+.summary-tile {
+  padding: 12px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.02);
+}
+
+.tile-value {
+  font-size: 1.3rem;
+  font-weight: 700;
+}
+
+.snapshot {
+  margin-top: 10px;
+  padding: 10px;
+  border: 1px dashed var(--border);
+  border-radius: 12px;
+  color: var(--muted);
+}
+
+.restore-banner {
+  position: sticky;
+  top: 0;
+  width: 100%;
+  background: #1f2430;
+  color: var(--text);
+  padding: 10px 16px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  border-bottom: 1px solid var(--border);
+  z-index: 20;
+}
+
+.banner-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.summary-actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
 }
 
 @media (max-width: 1180px) {

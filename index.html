@@ -146,13 +146,13 @@
             <p class="eyebrow">Mission profile</p>
             <div class="form-grid">
               <label>
-                Mission Duration
-                <select name="durationHours">
-                  <option value="12">12 hrs</option>
-                  <option value="24" selected>24 hrs</option>
+                Mission Duration (hours)
+                <input type="number" name="durationHours" min="1" list="duration-presets" value="24" />
+                <datalist id="duration-presets">
+                  <option value="24">24 hrs</option>
                   <option value="48">48 hrs</option>
                   <option value="72">72 hrs</option>
-                </select>
+                </datalist>
               </label>
               <label>
                 Environment
@@ -183,6 +183,10 @@
           <div class="subsection">
             <p class="eyebrow">Limits &amp; power</p>
             <div class="form-grid">
+              <label>
+                Safety factor
+                <input type="number" step="0.05" min="1" name="safetyFactor" value="1.2" />
+              </label>
               <fieldset class="stack">
                 <legend>Power Strategy</legend>
                 <label class="checkbox">
@@ -202,6 +206,20 @@
                 Notes
                 <textarea name="notes" rows="3" placeholder="Lane, AO, remarks..."></textarea>
               </label>
+            </div>
+          </div>
+          <div class="subsection">
+            <p class="eyebrow">Imports</p>
+            <div class="form-grid">
+              <label class="full-width">
+                Load Node/Platform designs JSON
+                <input type="file" id="design-import" accept="application/json" />
+              </label>
+              <label class="full-width">
+                Load Mission metadata JSON
+                <input type="file" id="mission-import" accept="application/json" />
+              </label>
+              <p class="muted full-width">Imports are optional. Provide Node/Platform designs to seed kits and items; provide mission metadata to pre-fill duration, environment, team, and safety factor.</p>
             </div>
           </div>
         </form>
@@ -270,6 +288,7 @@
             <button id="copy-checklist" class="btn-ghost" type="button">Copy Text Checklist</button>
             <button id="download-json" class="btn-ghost" type="button">Download JSON</button>
             <button id="download-atak" class="btn-primary" type="button">Download ATAK Mission Package (.zip)</button>
+            <button id="print-checklist" class="btn-primary" type="button">Printable Checklists</button>
           </div>
         </div>
         <div id="export-content" class="stack"></div>

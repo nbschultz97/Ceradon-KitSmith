@@ -489,6 +489,29 @@ legend {
   gap: 6px;
 }
 
+.summary-table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-top: 8px;
+  font-size: 0.95rem;
+}
+
+.summary-table th,
+.summary-table td {
+  border: 1px solid var(--border);
+  padding: 6px 8px;
+  text-align: left;
+}
+
+.summary-table th {
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--muted);
+}
+
+.status-row-red {
+  background: rgba(255, 107, 107, 0.08);
+}
+
 .summary-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
@@ -616,6 +639,37 @@ legend {
 }
 
 .demo-request-email {
+  color: var(--muted);
+}
+
+.printable-section {
+  margin-top: 12px;
+}
+
+.print-card {
+  border: 1px dashed var(--border);
+  padding: 10px;
+  border-radius: 8px;
+  margin-bottom: 10px;
+  background: rgba(255, 255, 255, 0.02);
+}
+
+.print-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.print-list li {
+  display: grid;
+  grid-template-columns: 2fr 60px 100px;
+  gap: 8px;
+  padding: 6px 0;
+  border-bottom: 1px solid var(--border);
+}
+
+.print-list .checkboxes {
+  letter-spacing: 6px;
   color: var(--muted);
 }
 

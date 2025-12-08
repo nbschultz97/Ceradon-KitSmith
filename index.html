@@ -5,209 +5,343 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Ceradon KitSmith</title>
   <link rel="stylesheet" href="styles.css">
+  <style>
+    :root {
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    }
+
+    #access-gate {
+      max-width: 560px;
+      margin: 10vh auto 4rem;
+      padding: 1.5rem 1.75rem;
+      background: #ffffff;
+      border: 1px solid #e2e4e9;
+      border-radius: 12px;
+      box-shadow: 0 12px 30px rgba(0, 0, 0, 0.08);
+      display: none;
+    }
+
+    #access-gate h1 {
+      margin: 0 0 0.25rem;
+      font-size: 1.5rem;
+    }
+
+    #access-gate p {
+      margin: 0 0 1rem;
+      color: #4a4f5a;
+    }
+
+    #access-gate label {
+      display: block;
+      margin-bottom: 0.5rem;
+      font-weight: 600;
+    }
+
+    #access-gate input[type="password"] {
+      width: 100%;
+      padding: 0.65rem 0.75rem;
+      border-radius: 8px;
+      border: 1px solid #c7ccd6;
+      font-size: 1rem;
+      margin-top: 0.25rem;
+    }
+
+    #access-gate button {
+      margin-top: 0.75rem;
+      padding: 0.65rem 1rem;
+      background: #1f6feb;
+      color: #ffffff;
+      border: none;
+      border-radius: 8px;
+      font-weight: 600;
+      cursor: pointer;
+      width: 100%;
+    }
+
+    #access-gate button:hover {
+      background: #1a5dc5;
+    }
+
+    #demo-error {
+      margin-top: 0.5rem;
+      color: #b42318;
+      background: #fef3f2;
+      border: 1px solid #fecdca;
+      padding: 0.5rem 0.75rem;
+      border-radius: 8px;
+      display: none;
+      font-size: 0.95rem;
+    }
+
+    #app-root {
+      display: none;
+    }
+  </style>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js" integrity="sha512-Fs5INomIQhR6CP3+xwlv6xLUOKUzYZdqzwc+ZZq0VEEv1pn6gGGY10m1HzFqp2saojlYCHGmDJtrvlaK0qIItw==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
 </head>
 <body>
-  <header class="top-bar">
-    <div class="brand">
-      <div class="brand-title">Ceradon KitSmith</div>
-      <p class="brand-subtitle">Kit &amp; sustainment planner</p>
-    </div>
-    <nav class="top-nav" aria-label="Primary">
-      <button class="nav-link" type="button" data-scroll="#constraints">Constraints</button>
-      <button class="nav-link" type="button" data-scroll="#inventory">Inventory</button>
-      <button class="nav-link" type="button" data-scroll="#kits">Kits</button>
-      <button class="nav-link" type="button" data-scroll="#summary">Summary</button>
-      <button class="nav-link" type="button" data-scroll="#export">Export</button>
-    </nav>
-  </header>
+  <div id="access-gate" role="region" aria-label="Access code gate">
+    <h1>Ceradon Systems — Ceradon KitSmith Demo</h1>
+    <p>Enter your demo access code to continue.</p>
+    <label for="demo-code">Access code</label>
+    <input id="demo-code" type="password" name="demo-code" autocomplete="off" inputmode="text" />
+    <button id="demo-enter" type="button">Enter</button>
+    <div id="demo-error" aria-live="polite">Invalid code. Please check and try again.</div>
+  </div>
 
-  <main class="layout">
-    <section id="constraints" class="panel">
-      <div class="panel-header">
-        <div>
-          <p class="eyebrow">Step 1 · Mission inputs</p>
-          <h2>Define mission</h2>
-        </div>
-        <div class="preset-actions">
-          <button id="demo-recon" class="btn-ghost" type="button">Load 24h Recon Patrol</button>
-          <button id="demo-uxs" class="btn-ghost" type="button">Load 48h UxS-Heavy Mission</button>
-          <button id="reset-constraints" class="btn-ghost" type="button">Reset to Blank</button>
-        </div>
+  <div id="app-root">
+    <header class="top-bar">
+      <div class="brand">
+        <div class="brand-title">Ceradon KitSmith</div>
+        <p class="brand-subtitle">Kit &amp; sustainment planner</p>
       </div>
-      <form id="constraints-form" class="form-grid" aria-label="Constraints">
-        <div class="subsection">
-          <p class="eyebrow">Mission profile</p>
-          <div class="form-grid">
-            <label>
-              Mission Duration
-              <select name="durationHours">
-                <option value="12">12 hrs</option>
-                <option value="24" selected>24 hrs</option>
-                <option value="48">48 hrs</option>
-                <option value="72">72 hrs</option>
-              </select>
-            </label>
-            <label>
-              Environment
-              <select name="environment">
-                <option value="Urban">Urban</option>
-                <option value="Rural">Rural</option>
-                <option value="Mountain">Mountain</option>
-                <option value="Arctic">Arctic</option>
-                <option value="Maritime">Maritime</option>
-                <option value="Desert">Desert</option>
-              </select>
-            </label>
+      <nav class="top-nav" aria-label="Primary">
+        <button class="nav-link" type="button" data-scroll="#constraints">Constraints</button>
+        <button class="nav-link" type="button" data-scroll="#inventory">Inventory</button>
+        <button class="nav-link" type="button" data-scroll="#kits">Kits</button>
+        <button class="nav-link" type="button" data-scroll="#summary">Summary</button>
+        <button class="nav-link" type="button" data-scroll="#export">Export</button>
+      </nav>
+    </header>
+
+    <main class="layout">
+      <section id="constraints" class="panel">
+        <div class="panel-header">
+          <div>
+            <p class="eyebrow">Step 1 · Mission inputs</p>
+            <h2>Define mission</h2>
+          </div>
+          <div class="preset-actions">
+            <button id="demo-recon" class="btn-ghost" type="button">Load 24h Recon Patrol</button>
+            <button id="demo-uxs" class="btn-ghost" type="button">Load 48h UxS-Heavy Mission</button>
+            <button id="reset-constraints" class="btn-ghost" type="button">Reset to Blank</button>
           </div>
         </div>
-        <div class="subsection">
-          <p class="eyebrow">Team</p>
-          <div class="form-grid">
-            <label>
-              Team Size
-              <input type="number" name="teamSize" min="1" value="4" />
-            </label>
-            <label>
-              Max Weight per Operator (kg)
-              <input type="number" step="0.5" min="0" name="maxWeightPerOperatorKg" value="22" />
-            </label>
-          </div>
-        </div>
-        <div class="subsection">
-          <p class="eyebrow">Limits &amp; power</p>
-          <div class="form-grid">
-            <fieldset class="stack">
-              <legend>Power Strategy</legend>
-              <label class="checkbox">
-                <input type="checkbox" name="powerExternal" />
-                External charging available
+        <form id="constraints-form" class="form-grid" aria-label="Constraints">
+          <div class="subsection">
+            <p class="eyebrow">Mission profile</p>
+            <div class="form-grid">
+              <label>
+                Mission Duration
+                <select name="durationHours">
+                  <option value="12">12 hrs</option>
+                  <option value="24" selected>24 hrs</option>
+                  <option value="48">48 hrs</option>
+                  <option value="72">72 hrs</option>
+                </select>
               </label>
-              <label class="checkbox">
-                <input type="checkbox" name="powerGenerator" />
-                Bring generator
+              <label>
+                Environment
+                <select name="environment">
+                  <option value="Urban">Urban</option>
+                  <option value="Rural">Rural</option>
+                  <option value="Mountain">Mountain</option>
+                  <option value="Arctic">Arctic</option>
+                  <option value="Maritime">Maritime</option>
+                  <option value="Desert">Desert</option>
+                </select>
               </label>
-              <label class="checkbox">
-                <input type="checkbox" name="powerBatteryOnly" checked />
-                Battery-only
+            </div>
+          </div>
+          <div class="subsection">
+            <p class="eyebrow">Team</p>
+            <div class="form-grid">
+              <label>
+                Team Size
+                <input type="number" name="teamSize" min="1" value="4" />
               </label>
-            </fieldset>
-            <label class="full-width">
-              Notes
-              <textarea name="notes" rows="3" placeholder="Lane, AO, remarks..."></textarea>
-            </label>
+              <label>
+                Max Weight per Operator (kg)
+                <input type="number" step="0.5" min="0" name="maxWeightPerOperatorKg" value="22" />
+              </label>
+            </div>
+          </div>
+          <div class="subsection">
+            <p class="eyebrow">Limits &amp; power</p>
+            <div class="form-grid">
+              <fieldset class="stack">
+                <legend>Power Strategy</legend>
+                <label class="checkbox">
+                  <input type="checkbox" name="powerExternal" />
+                  External charging available
+                </label>
+                <label class="checkbox">
+                  <input type="checkbox" name="powerGenerator" />
+                  Bring generator
+                </label>
+                <label class="checkbox">
+                  <input type="checkbox" name="powerBatteryOnly" checked />
+                  Battery-only
+                </label>
+              </fieldset>
+              <label class="full-width">
+                Notes
+                <textarea name="notes" rows="3" placeholder="Lane, AO, remarks..."></textarea>
+              </label>
+            </div>
+          </div>
+        </form>
+        <div class="snapshot" id="mission-snapshot" aria-live="polite"></div>
+      </section>
+
+      <section id="inventory" class="panel">
+        <div class="panel-header">
+          <div>
+            <p class="eyebrow">Step 2 · Loadout source</p>
+            <h2>Inventory</h2>
+          </div>
+          <div class="filters sticky-filter">
+            <div class="filter-buttons" id="category-buttons" aria-label="Category filters"></div>
+            <input id="filter-text" type="search" placeholder="Search name or tag" />
+            <div id="inventory-count" class="muted"></div>
           </div>
         </div>
-      </form>
-      <div class="snapshot" id="mission-snapshot" aria-live="polite"></div>
-    </section>
+        <div id="inventory-list" class="card-grid" aria-live="polite"></div>
+      </section>
 
-    <section id="inventory" class="panel">
-      <div class="panel-header">
-        <div>
-          <p class="eyebrow">Step 2 · Loadout source</p>
-          <h2>Inventory</h2>
-        </div>
-        <div class="filters sticky-filter">
-          <div class="filter-buttons" id="category-buttons" aria-label="Category filters"></div>
-          <input id="filter-text" type="search" placeholder="Search name or tag" />
-          <div id="inventory-count" class="muted"></div>
-        </div>
-      </div>
-      <div id="inventory-list" class="card-grid" aria-live="polite"></div>
-    </section>
-
-    <section id="kits" class="panel">
-      <div class="panel-header">
-        <div>
-          <p class="eyebrow">Step 3 · Build kits</p>
-          <h2>Kits</h2>
-        </div>
-        <div class="kit-actions">
-          <button id="add-kit" class="btn-primary" type="button">Add Kit</button>
-        </div>
-      </div>
-      <div id="kit-form" class="kit-form" hidden>
-        <label>
-          Kit name
-          <input type="text" id="kit-name-input" placeholder="RTO, TL, Vehicle" />
-        </label>
-        <label>
-          Role
-          <input type="text" id="kit-role-input" placeholder="Comms, Security..." />
-        </label>
-        <div class="kit-form-actions">
-          <button id="save-kit" class="btn-primary" type="button">Create</button>
-          <button id="cancel-kit" class="btn-ghost" type="button">Cancel</button>
-        </div>
-      </div>
-      <div id="kits-container" class="stack"></div>
-    </section>
-
-    <section id="summary" class="panel summary-panel">
-      <div class="panel-header">
-        <div>
-          <p class="eyebrow">Step 4 · Rollup</p>
-          <h2>Summary</h2>
-        </div>
-      </div>
-      <div id="summary-content" class="stack"></div>
-    </section>
-
-    <section id="export" class="panel summary-panel">
-      <div class="panel-header">
-        <div>
-          <p class="eyebrow">Step 5 · Share</p>
-          <h2>Export</h2>
-        </div>
-        <div class="summary-actions">
-          <button id="copy-checklist" class="btn-ghost" type="button">Copy Text Checklist</button>
-          <button id="download-json" class="btn-ghost" type="button">Download JSON</button>
-          <button id="download-atak" class="btn-primary" type="button">Download ATAK Mission Package (.zip)</button>
-        </div>
-      </div>
-      <div id="export-content" class="stack"></div>
-      <div id="clipboard-status" class="muted" role="status" aria-live="polite"></div>
-    </section>
-  </main>
-
-  <template id="kit-template">
-    <div class="kit-card">
-      <div class="kit-header">
-        <div>
-          <input class="kit-name" type="text" aria-label="Kit name" />
-          <input class="kit-role" type="text" aria-label="Kit role" placeholder="Role" />
-        </div>
-        <div class="kit-status">
-          <span class="badge status-badge">Status</span>
-          <button class="btn-ghost remove-kit" type="button">Remove</button>
-        </div>
-      </div>
-      <div class="kit-body">
-        <div class="kit-stats">
-          <div class="stat-block">
-            <p class="muted">Weight</p>
-            <div class="stat-value"><span class="kit-weight">0</span> kg</div>
+      <section id="kits" class="panel">
+        <div class="panel-header">
+          <div>
+            <p class="eyebrow">Step 3 · Build kits</p>
+            <h2>Kits</h2>
           </div>
-          <div class="stat-block">
-            <p class="muted">Energy</p>
-            <div class="stat-value"><span class="kit-energy">0</span> Wh</div>
-          </div>
-          <div class="stat-block">
-            <p class="muted">Runtime</p>
-            <div class="stat-value kit-runtime">--</div>
+          <div class="kit-actions">
+            <button id="add-kit" class="btn-primary" type="button">Add Kit</button>
           </div>
         </div>
-        <ul class="kit-items"></ul>
-        <p class="kit-empty">No items yet. Add from inventory.</p>
+        <div id="kit-form" class="kit-form" hidden>
+          <label>
+            Kit name
+            <input type="text" id="kit-name-input" placeholder="RTO, TL, Vehicle" />
+          </label>
+          <label>
+            Role
+            <input type="text" id="kit-role-input" placeholder="Comms, Security..." />
+          </label>
+          <div class="kit-form-actions">
+            <button id="save-kit" class="btn-primary" type="button">Create</button>
+            <button id="cancel-kit" class="btn-ghost" type="button">Cancel</button>
+          </div>
+        </div>
+        <div id="kits-container" class="stack"></div>
+      </section>
+
+      <section id="summary" class="panel summary-panel">
+        <div class="panel-header">
+          <div>
+            <p class="eyebrow">Step 4 · Rollup</p>
+            <h2>Summary</h2>
+          </div>
+        </div>
+        <div id="summary-content" class="stack"></div>
+      </section>
+
+      <section id="export" class="panel summary-panel">
+        <div class="panel-header">
+          <div>
+            <p class="eyebrow">Step 5 · Share</p>
+            <h2>Export</h2>
+          </div>
+          <div class="summary-actions">
+            <button id="copy-checklist" class="btn-ghost" type="button">Copy Text Checklist</button>
+            <button id="download-json" class="btn-ghost" type="button">Download JSON</button>
+            <button id="download-atak" class="btn-primary" type="button">Download ATAK Mission Package (.zip)</button>
+          </div>
+        </div>
+        <div id="export-content" class="stack"></div>
+        <div id="clipboard-status" class="muted" role="status" aria-live="polite"></div>
+      </section>
+    </main>
+
+    <template id="kit-template">
+      <div class="kit-card">
+        <div class="kit-header">
+          <div>
+            <input class="kit-name" type="text" aria-label="Kit name" />
+            <input class="kit-role" type="text" aria-label="Kit role" placeholder="Role" />
+          </div>
+          <div class="kit-status">
+            <span class="badge status-badge">Status</span>
+            <button class="btn-ghost remove-kit" type="button">Remove</button>
+          </div>
+        </div>
+        <div class="kit-body">
+          <div class="kit-stats">
+            <div class="stat-block">
+              <p class="muted">Weight</p>
+              <div class="stat-value"><span class="kit-weight">0</span> kg</div>
+            </div>
+            <div class="stat-block">
+              <p class="muted">Energy</p>
+              <div class="stat-value"><span class="kit-energy">0</span> Wh</div>
+            </div>
+            <div class="stat-block">
+              <p class="muted">Runtime</p>
+              <div class="stat-value kit-runtime">--</div>
+            </div>
+          </div>
+          <ul class="kit-items"></ul>
+          <p class="kit-empty">No items yet. Add from inventory.</p>
+        </div>
+        <div class="kit-footer">
+          <div class="badge badge-ghost kit-weight-badge">Weight status</div>
+          <div class="badge badge-ghost kit-power-badge">Power status</div>
+        </div>
       </div>
-      <div class="kit-footer">
-        <div class="badge badge-ghost kit-weight-badge">Weight status</div>
-        <div class="badge badge-ghost kit-power-badge">Power status</div>
-      </div>
-    </div>
-  </template>
+    </template>
+  </div>
 
   <script src="app.js"></script>
+  <script>
+    (function () {
+      const ACCESS_CODE = "KIT-FORGE-219";
+      const STORAGE_KEY = "ceradonDemoAuthorized";
+
+      const gate = document.getElementById("access-gate");
+      const appRoot = document.getElementById("app-root");
+      const input = document.getElementById("demo-code");
+      const enterButton = document.getElementById("demo-enter");
+      const error = document.getElementById("demo-error");
+
+      function showGate() {
+        gate.style.display = "block";
+        appRoot.style.display = "none";
+      }
+
+      function showApp() {
+        gate.style.display = "none";
+        appRoot.style.display = "block";
+      }
+
+      function validateCode() {
+        const value = (input.value || "").trim();
+        if (value === ACCESS_CODE) {
+          localStorage.setItem(STORAGE_KEY, "true");
+          error.style.display = "none";
+          showApp();
+        } else {
+          error.style.display = "block";
+        }
+      }
+
+      document.addEventListener("DOMContentLoaded", () => {
+        if (localStorage.getItem(STORAGE_KEY) === "true") {
+          showApp();
+          return;
+        }
+
+        showGate();
+        input.focus();
+
+        enterButton.addEventListener("click", validateCode);
+        input.addEventListener("keydown", (event) => {
+          if (event.key === "Enter") {
+            event.preventDefault();
+            validateCode();
+          }
+        });
+      });
+    })();
+  </script>
 </body>
 </html>

@@ -4,6 +4,7 @@ const defaultConstraints = {
   environment: 'Urban',
   teamSize: 4,
   maxWeightPerOperatorKg: 22,
+  safetyFactor: 1.2,
   powerStrategy: {
     powerExternal: false,
     powerGenerator: false,
@@ -398,6 +399,7 @@ const elements = {
   kitsContainer: document.getElementById('kits-container'),
   summaryContent: document.getElementById('summary-content'),
   exportContent: document.getElementById('export-content'),
+  printableContent: document.createElement('div'),
   snapshotEl: document.getElementById('mission-snapshot'),
   inventoryCount: document.getElementById('inventory-count'),
   constraintsForm: document.getElementById('constraints-form'),
@@ -406,6 +408,8 @@ const elements = {
   kitRoleInput: document.getElementById('kit-role-input'),
   clipboardStatus: document.getElementById('clipboard-status'),
   categoryButtons: document.getElementById('category-buttons'),
+  designImport: document.getElementById('design-import'),
+  missionImport: document.getElementById('mission-import'),
 };
 
 function structuredClone(obj) {
@@ -496,12 +500,68 @@ async function loadPresets() {
   }
 }
 
+function applyMissionMeta(meta = {}) {
+  if (meta.durationHours) state.constraints.durationHours = Number(meta.durationHours);
+  if (meta.environment) state.constraints.environment = meta.environment;
+  if (meta.teamSize) state.constraints.teamSize = Number(meta.teamSize);
+  if (meta.maxWeightPerOperatorKg) state.constraints.maxWeightPerOperatorKg = Number(meta.maxWeightPerOperatorKg);
+  if (meta.safetyFactor) state.constraints.safetyFactor = Number(meta.safetyFactor);
+  syncConstraintForm();
+  renderAll();
+  persistState();
+}
+
+function normalizeDesignItems(items = []) {
+  return items.reduce((acc, entry) => {
+    if (entry && entry.id) {
+      acc[entry.id] = (acc[entry.id] || 0) + (Number(entry.qty) || 1);
+    }
+    return acc;
+  }, {});
+}
+
+function importDesigns(payload) {
+  const kits = [];
+  const { nodes = [], platforms = [], kits: kitList = [] } = payload || {};
+
+  [...nodes, ...platforms, ...kitList].forEach((def, idx) => {
+    if (!def) return;
+    const kit = createKitBase(def.name || `Kit ${idx + 1}`, def.role || def.type || '');
+    kit.items = normalizeDesignItems(def.items || []);
+    kits.push(kit);
+  });
+
+  if (kits.length) {
+    state.kits = kits;
+    renderAll();
+    persistState();
+  }
+  if (payload?.mission) {
+    applyMissionMeta(payload.mission);
+  }
+}
+
+async function handleFileImport(inputEl, onLoad) {
+  const file = inputEl?.files?.[0];
+  if (!file) return;
+  try {
+    const text = await file.text();
+    const json = JSON.parse(text);
+    onLoad(json);
+  } catch (err) {
+    alert('Import failed: ' + err.message);
+  } finally {
+    inputEl.value = '';
+  }
+}
+
 function updateConstraintsFromForm() {
   const formData = new FormData(elements.constraintsForm);
   state.constraints.durationHours = Number(formData.get('durationHours')) || 0;
   state.constraints.environment = formData.get('environment') || 'Urban';
   state.constraints.teamSize = Number(formData.get('teamSize')) || 0;
   state.constraints.maxWeightPerOperatorKg = Number(formData.get('maxWeightPerOperatorKg')) || 0;
+  state.constraints.safetyFactor = Number(formData.get('safetyFactor')) || 1;
   state.constraints.powerStrategy = {
     powerExternal: formData.get('powerExternal') === 'on',
     powerGenerator: formData.get('powerGenerator') === 'on',
@@ -518,6 +578,7 @@ function syncConstraintForm() {
   form.environment.value = state.constraints.environment;
   form.teamSize.value = state.constraints.teamSize;
   form.maxWeightPerOperatorKg.value = state.constraints.maxWeightPerOperatorKg;
+  form.safetyFactor.value = state.constraints.safetyFactor;
   form.powerExternal.checked = !!state.constraints.powerStrategy.powerExternal;
   form.powerGenerator.checked = !!state.constraints.powerStrategy.powerGenerator;
   form.powerBatteryOnly.checked = !!state.constraints.powerStrategy.powerBatteryOnly;
@@ -601,11 +662,19 @@ function kitPowerProfile(kit) {
   const requiredWh = baselineWhPerHour * (state.constraints.durationHours || 0);
   const totals = calculateKitTotals(kit);
   const coverage = requiredWh > 0 ? totals.totalEnergyWh / requiredWh : 0;
+  const avgBatteryWh = totals.batteryCount > 0 ? totals.totalEnergyWh / totals.batteryCount : 0;
+  const modelBatteryRequirement = avgBatteryWh ? Math.ceil(requiredWh / avgBatteryWh) : 0;
+  const batteryRequirementWithSafety = modelBatteryRequirement ? Math.ceil(modelBatteryRequirement * (state.constraints.safetyFactor || 1)) : 0;
+  const safetyCoverage = requiredWh > 0 ? totals.totalEnergyWh / (requiredWh * (state.constraints.safetyFactor || 1)) : 0;
   return {
     baselineWhPerHour,
     requiredWh,
     coverage,
-    status: totals.totalEnergyWh >= requiredWh ? 'Power OK' : 'Power shortfall likely',
+    status: totals.totalEnergyWh >= requiredWh * (state.constraints.safetyFactor || 1) ? 'Power OK' : 'Power shortfall likely',
+    avgBatteryWh,
+    modelBatteryRequirement,
+    batteryRequirementWithSafety,
+    safetyCoverage,
   };
 }
 
@@ -672,10 +741,60 @@ function calculateMissionReadiness() {
   return { percentWithin, status, within, total: kits.length };
 }
 
+function buildOperatorSummary() {
+  const { maxWeightPerOperatorKg } = state.constraints;
+  return state.kits.map((kit, idx) => {
+    const totals = calculateKitTotals(kit);
+    const weight = totals.totalWeightKg;
+    const over = maxWeightPerOperatorKg ? weight > maxWeightPerOperatorKg : false;
+    return {
+      operator: kit.name || `Operator ${idx + 1}`,
+      role: kit.role || 'Role',
+      kits: 1,
+      totalWeightKg: weight,
+      overLimit: over,
+    };
+  });
+}
+
+function buildSustainmentTimeline() {
+  const durations = [24, 48, 72, state.constraints.durationHours || 0]
+    .filter((h) => Number.isFinite(h) && h > 0)
+    .filter((value, index, self) => self.indexOf(value) === index)
+    .sort((a, b) => a - b);
+
+  return state.kits.map((kit) => {
+    const totals = calculateKitTotals(kit);
+    const profile = kitPowerProfile(kit);
+    const rows = durations.map((hours) => {
+      const requiredWh = profile.baselineWhPerHour * hours;
+      const modelBatteries = profile.avgBatteryWh ? Math.ceil(requiredWh / profile.avgBatteryWh) : 0;
+      const safeBatteries = modelBatteries ? Math.ceil(modelBatteries * (state.constraints.safetyFactor || 1)) : 0;
+      const shortage = totals.totalEnergyWh < requiredWh * (state.constraints.safetyFactor || 1);
+      const sortieEquivalent = profile.baselineWhPerHour > 0 ? Math.floor(totals.totalEnergyWh / profile.baselineWhPerHour) : 0;
+      return {
+        hours,
+        requiredWh,
+        modelBatteries,
+        safeBatteries,
+        shortage,
+        sortieEquivalent,
+      };
+    });
+
+    return {
+      kit,
+      totals,
+      profile,
+      rows,
+    };
+  });
+}
+
 function renderMissionSnapshot() {
   const { durationHours, environment, teamSize, maxWeightPerOperatorKg, powerStrategy } = state.constraints;
   const power = powerStrategy.powerExternal ? 'External' : powerStrategy.powerGenerator ? 'Generator' : 'Battery-only';
-  elements.snapshotEl.textContent = `${durationHours}h | ${environment} | ${teamSize} operators | ${maxWeightPerOperatorKg} kg cap | ${power}`;
+  elements.snapshotEl.textContent = `${durationHours}h | ${environment} | ${teamSize} operators | ${maxWeightPerOperatorKg} kg cap | ${power} | Safety ${state.constraints.safetyFactor}x`;
 }
 
 function renderInventoryList() {
@@ -816,6 +935,10 @@ function renderKitsPanel() {
     clone.querySelector('.kit-energy').textContent = status.totals.totalEnergyWh;
     const runtimePct = Math.min(100, Math.round(status.runtime.coverage * 100));
     clone.querySelector('.kit-runtime').textContent = `${runtimePct}% of ${state.constraints.durationHours}h requirement`;
+    const batteryDetails = clone.querySelector('.kit-runtime');
+    const modelNeed = status.runtime.modelBatteryRequirement || 0;
+    const safeNeed = status.runtime.batteryRequirementWithSafety || 0;
+    batteryDetails.title = `Model batteries: ${modelNeed}, with safety factor (${state.constraints.safetyFactor}x): ${safeNeed}`;
 
     elements.kitsContainer.appendChild(clone);
   });
@@ -823,20 +946,40 @@ function renderKitsPanel() {
 
 function renderSummaryPanel() {
   const { teamWeight, avgWeight, batteryCounts, totalEnergy } = calculateTeamSummary();
-  const { maxWeightPerOperatorKg, teamSize, durationHours, environment } = state.constraints;
+  const { maxWeightPerOperatorKg, teamSize, durationHours, environment, safetyFactor } = state.constraints;
   const readiness = calculateMissionReadiness();
+  const operatorSummary = buildOperatorSummary();
+  const timeline = buildSustainmentTimeline();
 
   const kitsSummary = state.kits.map((kit) => {
     const status = kitStatus(kit);
     const weightStatus = status.overWeight ? 'Over limit' : 'Within weight limit';
-    const powerLabel = status.powerShortfall ? 'Power shortfall likely' : 'Power OK';
     const runtimePct = Math.min(100, Math.round(status.runtime.coverage * 100));
-    return `<li>${kit.name || 'Kit'} (${kit.role || 'Role'}) – ${status.totals.totalWeightKg} kg / ${maxWeightPerOperatorKg} kg – ${weightStatus} – Power: ~${runtimePct}% of ${durationHours}h requirement</li>`;
+    const modelNeed = status.runtime.modelBatteryRequirement || 0;
+    const safeNeed = status.runtime.batteryRequirementWithSafety || 0;
+    return `<li>${kit.name || 'Kit'} (${kit.role || 'Role'}) – ${status.totals.totalWeightKg} kg / ${maxWeightPerOperatorKg} kg – ${weightStatus} – Power: ~${runtimePct}% of ${durationHours}h requirement – Batteries: ${modelNeed} model | ${safeNeed} with safety</li>`;
   }).join('');
 
   const batteries = Object.entries(batteryCounts).map(([name, qty]) => `<li>${name}: ${qty}</li>`).join('') || '<li>None</li>';
 
   const weightStatusClass = readiness.percentWithin === 100 ? 'status-green' : readiness.percentWithin < 50 ? 'status-red' : 'status-amber';
+
+  const operatorTable = operatorSummary.length
+    ? `<table class="summary-table">
+        <thead><tr><th>Operator</th><th>Role</th><th>Kits</th><th>Total weight</th><th>Limit</th></tr></thead>
+        <tbody>
+          ${operatorSummary.map((op) => `<tr class="${op.overLimit ? 'status-row-red' : ''}"><td>${op.operator}</td><td>${op.role}</td><td>${op.kits}</td><td>${op.totalWeightKg} kg</td><td>${op.overLimit ? 'Over' : 'OK'}</td></tr>`).join('')}
+        </tbody>
+      </table>`
+    : '<p class="muted">No kits defined.</p>';
+
+  const timelineTables = timeline.length
+    ? timeline.map((entry) => {
+        const header = `${entry.kit.name || 'Kit'} (${entry.kit.role || 'Role'})`;
+        const rows = entry.rows.map((row) => `<tr class="${row.shortage ? 'status-row-red' : ''}"><td>${row.hours}h</td><td>${Math.ceil(row.requiredWh)} Wh</td><td>${row.modelBatteries}</td><td>${row.safeBatteries}</td><td>${entry.totals.batteryCount}</td><td>${row.sortieEquivalent} sortie-equiv</td></tr>`).join('');
+        return `<div class="summary-card"><h4>${header}</h4><p class="muted">Safety factor ${safetyFactor}x applied to requirements.</p><table class="summary-table"><thead><tr><th>Duration</th><th>Model Wh need</th><th>Batteries (model)</th><th>Batteries (safety)</th><th>On hand</th><th>Energy span</th></tr></thead><tbody>${rows}</tbody></table></div>`;
+      }).join('')
+    : '<p class="muted">Add kits to see sustainment timelines.</p>';
 
   elements.summaryContent.innerHTML = `
     <div class="summary-grid">
@@ -847,6 +990,10 @@ function renderSummaryPanel() {
       <div class="summary-tile">
         <p class="muted">Total operators</p>
         <div class="tile-value">${teamSize}</div>
+      </div>
+      <div class="summary-tile">
+        <p class="muted">Safety factor</p>
+        <div class="tile-value">${safetyFactor}x</div>
       </div>
       <div class="summary-tile">
         <p class="muted">Total team weight</p>
@@ -876,8 +1023,17 @@ function renderSummaryPanel() {
       <ul>${kitsSummary || '<li>No kits defined</li>'}</ul>
     </div>
     <div class="summary-card">
+      <h3>Per-operator loads</h3>
+      ${operatorTable}
+    </div>
+    <div class="summary-card">
       <h3>Batteries</h3>
       <ul>${batteries}</ul>
+    </div>
+    <div class="summary-card">
+      <h3>Sustainment timeline (batteries)</h3>
+      <p class="muted">Red rows indicate kits that cannot satisfy the duration after applying the safety factor.</p>
+      ${timelineTables}
     </div>
   `;
 
@@ -888,13 +1044,15 @@ function renderSummaryPanel() {
 function renderExportPanel() {
   const readiness = calculateMissionReadiness();
   const payload = buildExportPayload();
+  buildPrintableChecklists();
   elements.exportContent.innerHTML = `
     <div class="summary-card">
-      <p class="muted">JSON export includes constraints, kits, inventory used, and computed totals.</p>
-      <p class="muted">Current readiness: ${readiness.status}.</p>
+      <p class="muted">JSON export includes constraints, kits, inventory used, operator loads, safety factor, and sustainment flags.</p>
+      <p class="muted">Current readiness: ${readiness.status}. Safety factor ${state.constraints.safetyFactor}x.</p>
       <p class="muted">${payload.kits.length} kits | ${payload.summary.teamWeight} kg team weight.</p>
     </div>
   `;
+  elements.exportContent.appendChild(elements.printableContent);
 }
 
 function handleInventoryActions(e) {
@@ -945,6 +1103,7 @@ function buildChecklistText() {
   const { constraints } = state;
   const lines = [
     `Mission: ${constraints.durationHours}h, ${constraints.environment}, ${constraints.teamSize} operators`,
+    `Safety factor: ${constraints.safetyFactor}x`,
     `Limits: ${constraints.maxWeightPerOperatorKg} kg per operator`,
     `Power: ${constraints.powerStrategy.powerBatteryOnly ? 'Battery-only' : constraints.powerStrategy.powerGenerator ? 'Generator-backed' : 'External/shore available'}`,
     '',
@@ -990,6 +1149,29 @@ function copyChecklist() {
   }
 }
 
+function buildPrintableChecklists() {
+  const container = elements.printableContent;
+  container.className = 'printable-section';
+  if (!state.kits.length) {
+    container.innerHTML = '<p class="muted">Add kits to build a printable checklist.</p>';
+    return;
+  }
+  container.innerHTML = `
+    <div class="summary-card">
+      <h3>Printable checklists</h3>
+      <p class="muted">One section per kit. Use browser print to produce paper copies.</p>
+    </div>
+    ${state.kits.map((kit) => {
+      const items = Object.entries(kit.items).map(([itemId, qty]) => {
+        const item = state.inventoryById[itemId];
+        if (!item) return '';
+        return `<li><span>${item.name}</span><span class="qty">${qty}x</span><span class="checkboxes">☐ ☐ ☐</span></li>`;
+      }).join('');
+      return `<div class="print-card"><h4>${kit.name || 'Kit'} — ${kit.role || 'Role'}</h4><ul class="print-list">${items || '<li>No items</li>'}</ul></div>`;
+    }).join('')}
+  `;
+}
+
 function buildExportPayload() {
   const kitsWithTotals = state.kits.map((kit) => ({
     ...kit,
@@ -1001,12 +1183,25 @@ function buildExportPayload() {
     Object.keys(kit.items).forEach((id) => usedInventoryIds.add(id));
   });
   const inventoryUsed = Array.from(usedInventoryIds).map((id) => state.inventoryById[id]).filter(Boolean);
+  const sustainment = buildSustainmentTimeline().map((entry) => ({
+    kit: { name: entry.kit.name, role: entry.kit.role },
+    totals: entry.totals,
+    rows: entry.rows,
+    status: entry.rows.some((r) => r.shortage) ? 'Risk' : 'OK',
+  }));
   return {
     constraints: state.constraints,
     kits: kitsWithTotals,
     inventoryUsed,
     summary: calculateTeamSummary(),
     readiness: calculateMissionReadiness(),
+    operatorLoads: buildOperatorSummary(),
+    sustainment,
+    missionProject: {
+      kitDefinitions: kitsWithTotals,
+      operatorLoads: buildOperatorSummary(),
+      sustainment,
+    },
     exportedAt: new Date().toISOString(),
   };
 }
@@ -1141,8 +1336,14 @@ function attachEvents() {
   document.getElementById('copy-checklist').addEventListener('click', copyChecklist);
   document.getElementById('download-json').addEventListener('click', downloadJSON);
   document.getElementById('download-atak').addEventListener('click', exportAtakMissionPackage);
+  document.getElementById('print-checklist').addEventListener('click', () => {
+    buildPrintableChecklists();
+    window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' });
+  });
   document.getElementById('demo-recon').addEventListener('click', () => applyPreset('recon24'));
   document.getElementById('demo-uxs').addEventListener('click', () => applyPreset('uxs48'));
+  elements.designImport.addEventListener('change', () => handleFileImport(elements.designImport, importDesigns));
+  elements.missionImport.addEventListener('change', () => handleFileImport(elements.missionImport, applyMissionMeta));
   document.querySelectorAll('.nav-link').forEach((btn) => {
     btn.addEventListener('click', () => {
       const target = document.querySelector(btn.dataset.scroll);

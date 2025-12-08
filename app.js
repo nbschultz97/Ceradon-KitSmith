@@ -11,6 +11,8 @@ const defaultConstraints = {
     powerBatteryOnly: true,
   },
   notes: '',
+  altitudeM: null,
+  temperatureC: null,
 };
 
 const fallbackPresets = [
@@ -157,6 +159,74 @@ const fallbackPresets = [
           power_solar_fold: 1,
           sustain_mre: 2,
           sustain_water_blader: 1,
+        },
+      },
+    ],
+  },
+  {
+    id: 'whitefrost',
+    label: 'WHITEFROST Demo',
+    constraints: {
+      durationHours: 72,
+      environment: 'Arctic Mountain',
+      teamSize: 5,
+      maxWeightPerOperatorKg: 24,
+      safetyFactor: 1.35,
+      powerStrategy: {
+        powerExternal: false,
+        powerGenerator: false,
+        powerBatteryOnly: true,
+      },
+      notes: 'Project WHITEFROST: cold-weather recon with mesh relays and partner sustainment.',
+      altitudeM: 2600,
+      temperatureC: -15,
+    },
+    kits: [
+      {
+        name: 'WHITEFROST TL',
+        role: 'Lead',
+        items: {
+          radio_harris_152: 1,
+          radio_rto_headset: 1,
+          bat_98wh_brick: 2,
+          sustain_mre: 3,
+          sustain_water_blader: 1,
+          tool_multitool: 1,
+        },
+      },
+      {
+        name: 'Mesh Relay Team',
+        role: 'Mesh Relay',
+        items: {
+          node_vantage_edge: 2,
+          bat_98wh_brick: 2,
+          bat_240wh_station: 1,
+          power_solar_fold: 1,
+          tool_tripod: 1,
+          sustain_mre: 2,
+          sustain_water_blader: 1,
+        },
+      },
+      {
+        name: 'Scout Quad',
+        role: 'ISR Quad',
+        items: {
+          uxs_quadcopter_scout: 1,
+          bat_4s_5000: 4,
+          bat_98wh_brick: 1,
+          tool_multitool: 1,
+          sustain_mre: 2,
+          sustain_water_blader: 1,
+        },
+      },
+      {
+        name: 'Partner Sustainment',
+        role: 'Partner Support',
+        items: {
+          sustain_mre: 4,
+          sustain_water_blader: 2,
+          other_batterycharger: 1,
+          bat_98wh_brick: 1,
         },
       },
     ],
@@ -384,6 +454,7 @@ const state = {
   inventory: [],
   inventoryById: {},
   presets: [],
+  statusMessage: '',
 };
 
 function normalizeKitsData(kitsLike) {
@@ -392,7 +463,9 @@ function normalizeKitsData(kitsLike) {
   return arr.map((kit) => ({
     ...kit,
     id: kit.id || `kit_${crypto.randomUUID ? crypto.randomUUID() : Date.now()}`,
-    items: kit.items || {},
+    items: Array.isArray(kit.items)
+      ? normalizeDesignItems(kit.items)
+      : (kit.items || {}),
   }));
 }
 
@@ -423,6 +496,7 @@ const elements = {
   categoryButtons: document.getElementById('category-buttons'),
   designImport: document.getElementById('design-import'),
   missionImport: document.getElementById('mission-import'),
+  missionProjectImport: document.getElementById('mission-project-import'),
   addOperatorBtn: document.getElementById('add-operator'),
   printPackingBtn: document.getElementById('print-packing'),
 };
@@ -437,22 +511,66 @@ function formatTimestamp() {
   return `${now.getFullYear()}${pad(now.getMonth() + 1)}${pad(now.getDate())}_${pad(now.getHours())}${pad(now.getMinutes())}`;
 }
 
-function persistState() {
-  const project = state.project || loadMissionProject();
-  project.kits = project.kits || {};
-  project.kits.definitions = state.kits.map((kit) => ({ ...kit, items: { ...kit.items } }));
-  project.kits.assignments = state.assignments.map((assign) => ({ ...assign, kitIds: [...assign.kitIds] }));
-  project.sustainment = {
-    ...project.sustainment,
-    durationHours: state.constraints.durationHours,
-    environment: state.constraints.environment,
-    teamSize: state.constraints.teamSize,
-    maxWeightPerOperatorKg: state.constraints.maxWeightPerOperatorKg,
-    safetyFactor: state.constraints.safetyFactor,
-    powerStrategy: state.constraints.powerStrategy,
-    notes: state.constraints.notes,
+function setStatusMessage(text, tone = 'info') {
+  state.statusMessage = text || '';
+  const banner = document.getElementById('status-banner');
+  if (!banner) return;
+  if (!text) {
+    banner.hidden = true;
+    return;
+  }
+  banner.hidden = false;
+  banner.dataset.tone = tone;
+  banner.textContent = text;
+}
+
+function buildMissionProjectFromState() {
+  const base = state.project || createEmptyMissionProject();
+  const project = {
+    ...base,
+    origin_tool: 'kit',
+    name: base.name || 'KitSmith mission',
+    constraints: {
+      ...base.constraints,
+      duration_hours: state.constraints.durationHours,
+      team_size: state.constraints.teamSize,
+      max_weight_per_operator_kg: state.constraints.maxWeightPerOperatorKg,
+      safety_factor: state.constraints.safetyFactor,
+      power_strategy: {
+        ...structuredClone(defaultConstraints.powerStrategy),
+        ...(state.constraints.powerStrategy || {}),
+      },
+    },
+    environment: {
+      ...(base.environment || {}),
+      terrain: state.constraints.environment,
+      altitude_m: state.constraints.altitudeM,
+      temperature_c: state.constraints.temperatureC,
+      notes: state.constraints.notes,
+    },
+    mission: {
+      ...(base.mission || {}),
+      summary: base.mission?.summary || 'Loaded via KitSmith',
+    },
+    kits: {
+      origin_tool: 'kit',
+      definitions: state.kits.map((kit) => ({
+        ...kit,
+        origin_tool: 'kit',
+        items: { ...kit.items },
+      })),
+      assignments: state.assignments.map((assign) => ({
+        ...assign,
+        origin_tool: 'kit',
+        kitIds: [...assign.kitIds],
+      })),
+    },
   };
-  state.project = saveMissionProject(project);
+  return project;
+}
+
+function persistState() {
+  state.project = saveMissionProject(buildMissionProjectFromState());
 }
 
 function loadLegacyState() {
@@ -469,16 +587,19 @@ function loadLegacyState() {
 function hydrateFromMissionProject() {
   const project = loadMissionProject();
   state.project = project;
-  const sustainment = project.sustainment || {};
+  const constraints = project.constraints || {};
+  const env = project.environment || {};
   state.constraints = {
     ...structuredClone(defaultConstraints),
-    durationHours: sustainment.durationHours ?? defaultConstraints.durationHours,
-    environment: sustainment.environment || defaultConstraints.environment,
-    teamSize: sustainment.teamSize ?? defaultConstraints.teamSize,
-    maxWeightPerOperatorKg: sustainment.maxWeightPerOperatorKg ?? defaultConstraints.maxWeightPerOperatorKg,
-    safetyFactor: sustainment.safetyFactor ?? defaultConstraints.safetyFactor,
-    powerStrategy: { ...structuredClone(defaultConstraints.powerStrategy), ...(sustainment.powerStrategy || {}) },
-    notes: sustainment.notes || '',
+    durationHours: constraints.duration_hours ?? constraints.durationHours ?? defaultConstraints.durationHours,
+    environment: env.terrain || constraints.environment || defaultConstraints.environment,
+    teamSize: constraints.team_size ?? constraints.teamSize ?? defaultConstraints.teamSize,
+    maxWeightPerOperatorKg: constraints.max_weight_per_operator_kg ?? constraints.maxWeightPerOperatorKg ?? defaultConstraints.maxWeightPerOperatorKg,
+    safetyFactor: constraints.safety_factor ?? constraints.safetyFactor ?? defaultConstraints.safetyFactor,
+    powerStrategy: { ...structuredClone(defaultConstraints.powerStrategy), ...(constraints.power_strategy || constraints.powerStrategy || {}) },
+    notes: env.notes || project.mission?.summary || '',
+    altitudeM: env.altitude_m ?? null,
+    temperatureC: env.temperature_c ?? null,
   };
 
   const kitsSection = project.kits || {};
@@ -516,6 +637,7 @@ async function loadInventory() {
     state.inventory = fallbackInventory;
     state.inventoryById = Object.fromEntries(fallbackInventory.map((item) => [item.id, item]));
     elements.inventoryListEl.innerHTML = '<p class="muted">Inventory failed to load from /data. Using embedded fallback catalog.</p>';
+    setStatusMessage('Inventory fallback loaded (offline/denied).', 'warning');
   }
 }
 
@@ -531,11 +653,13 @@ async function loadPresets() {
 }
 
 function applyMissionMeta(meta = {}) {
-  if (meta.durationHours) state.constraints.durationHours = Number(meta.durationHours);
-  if (meta.environment) state.constraints.environment = meta.environment;
-  if (meta.teamSize) state.constraints.teamSize = Number(meta.teamSize);
-  if (meta.maxWeightPerOperatorKg) state.constraints.maxWeightPerOperatorKg = Number(meta.maxWeightPerOperatorKg);
-  if (meta.safetyFactor) state.constraints.safetyFactor = Number(meta.safetyFactor);
+  if (meta.durationHours || meta.duration_hours) state.constraints.durationHours = Number(meta.durationHours ?? meta.duration_hours);
+  if (meta.environment || meta.terrain) state.constraints.environment = meta.environment || meta.terrain;
+  if (meta.teamSize || meta.team_size) state.constraints.teamSize = Number(meta.teamSize ?? meta.team_size);
+  if (meta.maxWeightPerOperatorKg || meta.max_weight_per_operator_kg) state.constraints.maxWeightPerOperatorKg = Number(meta.maxWeightPerOperatorKg ?? meta.max_weight_per_operator_kg);
+  if (meta.safetyFactor || meta.safety_factor) state.constraints.safetyFactor = Number(meta.safetyFactor ?? meta.safety_factor);
+  if (meta.altitudeM || meta.altitude_m) state.constraints.altitudeM = Number(meta.altitudeM ?? meta.altitude_m);
+  if (meta.temperatureC || meta.temperature_c) state.constraints.temperatureC = Number(meta.temperatureC ?? meta.temperature_c);
   syncConstraintForm();
   renderAll();
   persistState();
@@ -554,6 +678,19 @@ function importDesigns(payload) {
   const kits = [];
   const { nodes = [], platforms = [], kits: kitList = [] } = payload || {};
 
+  const project = state.project || createEmptyMissionProject();
+  project.nodes = (nodes || []).map((node, idx) => ({
+    id: node.id || `node_${idx + 1}`,
+    origin_tool: node.origin_tool || 'node',
+    ...node,
+  }));
+  project.platforms = (platforms || []).map((platform, idx) => ({
+    id: platform.id || `platform_${idx + 1}`,
+    origin_tool: platform.origin_tool || 'uxs',
+    ...platform,
+  }));
+  state.project = saveMissionProject(project);
+
   [...nodes, ...platforms, ...kitList].forEach((def, idx) => {
     if (!def) return;
     const kit = createKitBase(def.name || `Kit ${idx + 1}`, def.role || def.type || '');
@@ -571,6 +708,21 @@ function importDesigns(payload) {
   }
 }
 
+function importMissionProject(payload) {
+  const project = saveMissionProject(payload || {});
+  state.project = project;
+  const kitsSection = project.kits || {};
+  state.kits = normalizeKitsData(kitsSection.definitions || kitsSection.kits || []);
+  state.assignments = normalizeAssignments(kitsSection.assignments);
+  applyMissionMeta(project.constraints || {});
+  if (!state.assignments.length && state.kits.length) {
+    state.assignments = state.kits.map((kit, idx) => ({ id: `asg_${kit.id}`, operator: kit.name || `Operator ${idx + 1}`, role: kit.role || '', kitIds: [kit.id] }));
+  }
+  renderAll();
+  persistState();
+  setStatusMessage('MissionProject loaded', 'info');
+}
+
 async function handleFileImport(inputEl, onLoad) {
   const file = inputEl?.files?.[0];
   if (!file) return;
@@ -578,8 +730,10 @@ async function handleFileImport(inputEl, onLoad) {
     const text = await file.text();
     const json = JSON.parse(text);
     onLoad(json);
+    setStatusMessage(`${file.name} imported successfully`, 'info');
   } catch (err) {
-    alert('Import failed: ' + err.message);
+    console.error(err);
+    setStatusMessage('Import failed: ' + err.message, 'error');
   } finally {
     inputEl.value = '';
   }
@@ -598,6 +752,8 @@ function updateConstraintsFromForm() {
     powerBatteryOnly: formData.get('powerBatteryOnly') === 'on',
   };
   state.constraints.notes = formData.get('notes') || '';
+  state.constraints.altitudeM = formData.get('altitudeM') ? Number(formData.get('altitudeM')) : null;
+  state.constraints.temperatureC = formData.get('temperatureC') ? Number(formData.get('temperatureC')) : null;
   renderAll();
   persistState();
 }
@@ -613,6 +769,8 @@ function syncConstraintForm() {
   form.powerGenerator.checked = !!state.constraints.powerStrategy.powerGenerator;
   form.powerBatteryOnly.checked = !!state.constraints.powerStrategy.powerBatteryOnly;
   form.notes.value = state.constraints.notes || '';
+  form.altitudeM.value = state.constraints.altitudeM ?? '';
+  form.temperatureC.value = state.constraints.temperatureC ?? '';
 }
 
 function resetConstraintsForm() {
@@ -895,9 +1053,10 @@ function buildSustainmentTimeline() {
 }
 
 function renderMissionSnapshot() {
-  const { durationHours, environment, teamSize, maxWeightPerOperatorKg, powerStrategy } = state.constraints;
+  const { durationHours, environment, teamSize, maxWeightPerOperatorKg, powerStrategy, altitudeM, temperatureC } = state.constraints;
   const power = powerStrategy.powerExternal ? 'External' : powerStrategy.powerGenerator ? 'Generator' : 'Battery-only';
-  elements.snapshotEl.textContent = `${durationHours}h | ${environment} | ${teamSize} operators | ${maxWeightPerOperatorKg} kg cap | ${power} | Safety ${state.constraints.safetyFactor}x`;
+  const envBits = [environment, altitudeM ? `${altitudeM}m` : null, temperatureC ? `${temperatureC}°C` : null].filter(Boolean).join(' · ');
+  elements.snapshotEl.textContent = `${durationHours}h | ${envBits} | ${teamSize} operators | ${maxWeightPerOperatorKg} kg cap | ${power} | Safety ${state.constraints.safetyFactor}x`;
 }
 
 function renderInventoryList() {
@@ -1379,6 +1538,9 @@ function buildExportPayload() {
     rows: entry.rows,
     status: entry.rows.some((r) => r.shortage) ? 'Risk' : 'OK',
   }));
+  const missionProject = buildMissionProjectFromState();
+  const geojson = buildMissionGeoJson(missionProject);
+  const cotStub = buildCotStub(missionProject);
   return {
     constraints: state.constraints,
     kits: kitsWithTotals,
@@ -1388,13 +1550,101 @@ function buildExportPayload() {
     readiness: calculateMissionReadiness(),
     operatorLoads: buildOperatorSummary(),
     sustainment,
-    missionProject: {
-      kitDefinitions: kitsWithTotals,
-      operatorAssignments: state.assignments,
-      operatorLoads: buildOperatorSummary(),
-      sustainment,
-    },
+    missionProject,
+    geojson,
+    cot: cotStub,
     exportedAt: new Date().toISOString(),
+  };
+}
+
+function toPointGeometry(geo = {}) {
+  const { lat, lon, lng, elevation, alt } = geo;
+  const latitude = typeof lat === 'number' ? lat : null;
+  const longitude = typeof lon === 'number' ? lon : (typeof lng === 'number' ? lng : null);
+  if (latitude === null || longitude === null) return null;
+  const coordinates = [longitude, latitude];
+  if (typeof elevation === 'number' || typeof alt === 'number') {
+    coordinates.push(elevation ?? alt);
+  }
+  return {
+    type: 'Point',
+    coordinates,
+  };
+}
+
+function buildMissionGeoJson(project) {
+  const features = [];
+  const pushEntity = (entity, kind) => {
+    const geometry = toPointGeometry(entity.geo || entity.location || {});
+    if (!geometry) return;
+    features.push({
+      type: 'Feature',
+      geometry,
+      properties: {
+        id: entity.id,
+        name: entity.name,
+        role: entity.role || kind,
+        kind,
+        origin_tool: entity.origin_tool || project.origin_tool || 'kit',
+        rf_bands: entity.rf_bands || entity.rfBands,
+        power_wh: entity.power?.battery_wh,
+      },
+    });
+  };
+  (project.nodes || []).forEach((node) => pushEntity(node, 'node'));
+  (project.platforms || []).forEach((platform) => pushEntity(platform, 'platform'));
+  (project.mesh_links || []).forEach((link) => {
+    const from = (project.nodes || []).find((n) => n.id === link.from || n.id === link.source);
+    const to = (project.nodes || []).find((n) => n.id === link.to || n.id === link.target);
+    const fromGeo = from ? toPointGeometry(from.geo || from.location || {}) : null;
+    const toGeo = to ? toPointGeometry(to.geo || to.location || {}) : null;
+    if (!fromGeo || !toGeo) return;
+    features.push({
+      type: 'Feature',
+      geometry: {
+        type: 'LineString',
+        coordinates: [fromGeo.coordinates, toGeo.coordinates],
+      },
+      properties: {
+        id: link.id,
+        name: link.name || `${from?.name || 'Node'} → ${to?.name || 'Node'}`,
+        band: link.band || link.rf_band,
+        range_km: link.range_km,
+        origin_tool: link.origin_tool || project.origin_tool || 'kit',
+      },
+    });
+  });
+  return {
+    type: 'FeatureCollection',
+    features,
+  };
+}
+
+function buildCotStub(project) {
+  const units = [];
+  const collectUnit = (entity, type) => {
+    const geometry = toPointGeometry(entity.geo || entity.location || {});
+    if (!geometry) return;
+    units.push({
+      uid: entity.id,
+      type,
+      name: entity.name || type,
+      role: entity.role || '',
+      lat: geometry.coordinates[1],
+      lon: geometry.coordinates[0],
+      alt: geometry.coordinates[2] || null,
+      rf_bands: entity.rf_bands || entity.rfBands,
+      origin_tool: entity.origin_tool || project.origin_tool || 'kit',
+    });
+  };
+  (project.nodes || []).forEach((node) => collectUnit(node, 'node'));
+  (project.platforms || []).forEach((platform) => collectUnit(platform, 'platform'));
+  const nowIso = new Date().toISOString();
+  return {
+    name: project.name,
+    summary: project.mission?.summary || '',
+    time: nowIso,
+    units,
   };
 }
 
@@ -1403,6 +1653,19 @@ function downloadJSON() {
   const envSafe = state.constraints.environment.toLowerCase();
   const fileName = `kitsmith_export_${state.constraints.durationHours}h_${envSafe}_${formatTimestamp()}.json`;
   const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = fileName;
+  link.click();
+  URL.revokeObjectURL(url);
+}
+
+function downloadMissionProject() {
+  const project = buildMissionProjectFromState();
+  const envSafe = state.constraints.environment.toLowerCase();
+  const fileName = `mission_project_${state.constraints.durationHours}h_${envSafe}_${formatTimestamp()}.json`;
+  const blob = new Blob([JSON.stringify(project, null, 2)], { type: 'application/json' });
   const url = URL.createObjectURL(blob);
   const link = document.createElement('a');
   link.href = url;
@@ -1435,12 +1698,18 @@ async function exportAtakMissionPackage() {
   const envSafe = state.constraints.environment.toLowerCase();
   const timestamp = formatTimestamp();
   const jsonName = `kitsmith/kit_${timestamp}.json`;
+  const missionProjectName = `kitsmith/mission_project_${timestamp}.json`;
+  const geoName = `kitsmith/mission_${timestamp}.geojson`;
+  const cotName = `kitsmith/mission_${timestamp}_cot.json`;
   const manifestName = 'MANIFEST/manifest.xml';
   const packageName = `KitSmith_MissionPackage_${state.constraints.durationHours}h_${envSafe}_${timestamp}.zip`;
   const manifest = buildManifest(`KitSmith_${state.constraints.durationHours}h_${state.constraints.environment}_${timestamp}`, jsonName);
 
   const zip = new JSZip();
   zip.file(jsonName, JSON.stringify(payload, null, 2));
+  zip.file(missionProjectName, JSON.stringify(payload.missionProject, null, 2));
+  zip.file(geoName, JSON.stringify(payload.geojson, null, 2));
+  zip.file(cotName, JSON.stringify(payload.cot, null, 2));
   zip.file(manifestName, manifest);
   const blob = await zip.generateAsync({ type: 'blob' });
   const url = URL.createObjectURL(blob);
@@ -1528,6 +1797,7 @@ function attachEvents() {
   document.getElementById('cancel-kit').addEventListener('click', () => toggleKitForm(false));
   document.getElementById('copy-checklist').addEventListener('click', copyChecklist);
   document.getElementById('download-json').addEventListener('click', downloadJSON);
+  document.getElementById('download-mission-project').addEventListener('click', downloadMissionProject);
   document.getElementById('download-atak').addEventListener('click', exportAtakMissionPackage);
   elements.addOperatorBtn.addEventListener('click', () => addAssignment('Operator', ''));
   elements.printPackingBtn.addEventListener('click', () => window.print());
@@ -1536,8 +1806,11 @@ function attachEvents() {
   elements.packingListsContent.addEventListener('click', handleAssignmentActions);
   document.getElementById('demo-recon').addEventListener('click', () => applyPreset('recon24'));
   document.getElementById('demo-uxs').addEventListener('click', () => applyPreset('uxs48'));
+  const whitefrostBtn = document.getElementById('demo-whitefrost');
+  if (whitefrostBtn) whitefrostBtn.addEventListener('click', () => applyPreset('whitefrost'));
   elements.designImport.addEventListener('change', () => handleFileImport(elements.designImport, importDesigns));
   elements.missionImport.addEventListener('change', () => handleFileImport(elements.missionImport, applyMissionMeta));
+  if (elements.missionProjectImport) elements.missionProjectImport.addEventListener('change', () => handleFileImport(elements.missionProjectImport, importMissionProject));
   document.querySelectorAll('.nav-link').forEach((btn) => {
     btn.addEventListener('click', () => {
       const target = document.querySelector(btn.dataset.scroll);

@@ -145,5 +145,73 @@
         }
       }
     ]
+  },
+  {
+    "id": "whitefrost",
+    "label": "WHITEFROST Demo",
+    "constraints": {
+      "durationHours": 72,
+      "environment": "Arctic Mountain",
+      "teamSize": 5,
+      "maxWeightPerOperatorKg": 24,
+      "powerStrategy": {
+        "powerExternal": false,
+        "powerGenerator": false,
+        "powerBatteryOnly": true
+      },
+      "notes": "Project WHITEFROST: cold-weather recon with mesh relays and partner sustainment.",
+      "altitudeM": 2600,
+      "temperatureC": -15,
+      "safetyFactor": 1.35
+    },
+    "kits": [
+      {
+        "name": "WHITEFROST TL",
+        "role": "Lead",
+        "items": {
+          "radio_harris_152": 1,
+          "radio_rto_headset": 1,
+          "bat_98wh_brick": 2,
+          "sustain_mre": 3,
+          "sustain_water_blader": 1,
+          "tool_multitool": 1
+        }
+      },
+      {
+        "name": "Mesh Relay Team",
+        "role": "Mesh Relay",
+        "items": {
+          "node_vantage_edge": 2,
+          "bat_98wh_brick": 2,
+          "bat_240wh_station": 1,
+          "power_solar_fold": 1,
+          "tool_tripod": 1,
+          "sustain_mre": 2,
+          "sustain_water_blader": 1
+        }
+      },
+      {
+        "name": "Scout Quad",
+        "role": "ISR Quad",
+        "items": {
+          "uxs_quadcopter_scout": 1,
+          "bat_4s_5000": 4,
+          "bat_98wh_brick": 1,
+          "tool_multitool": 1,
+          "sustain_mre": 2,
+          "sustain_water_blader": 1
+        }
+      },
+      {
+        "name": "Partner Sustainment",
+        "role": "Partner Support",
+        "items": {
+          "sustain_mre": 4,
+          "sustain_water_blader": 2,
+          "other_batterycharger": 1,
+          "bat_98wh_brick": 1
+        }
+      }
+    ]
   }
 ]

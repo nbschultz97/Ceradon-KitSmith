@@ -41,14 +41,18 @@ For GitHub Pages, set the branch to publish the root of this repository (e.g., `
 - Add or adjust categories and tags to match your kits; the filters are data-driven.
 
 ## Presets, imports, and MissionProject integration
-To seed example kits, edit `app.js` in `hydrateDefaults()` or extend with a `data/presets.json` loader. The UI and state model are ready for imports from other Ceradon tools (e.g., Mission Architect) by reusing the `kits` and `constraints` objects.
+To seed example kits, edit `app.js` or extend with `data/presets.json`. The UI now ships a **WHITEFROST Demo** preset (72h cold-weather recon) and honors MissionProject imports/exports.
 
-You can now import Node/Platform design JSON (arrays of `nodes`, `platforms`, or `kits` with `name`, `role`, and `items: [{"id","qty"}]`) plus optional `mission` metadata (`durationHours`, `environment`, `teamSize`, `maxWeightPerOperatorKg`, `safetyFactor`). Imported kits replace the working set and immediately refresh summary/power logic. The export payload also includes a `missionProject` block containing kit definitions, operator loads, and sustainment flags so downstream MissionProject JSON can be patched without changing the static front end.
+KitSmith reads and writes a shared **MissionProject** JSON envelope (schema v2, documented in `docs/mission_project_schema.md`). Imports tolerate partial data and tag entities with `origin_tool` (`kit`, `node`, `mesh`, etc.). You can load:
+- Node/Platform design JSON (arrays of `nodes`, `platforms`, or `kits` with `name`, `role`, and `items: [{"id","qty"}]`).
+- Mission metadata JSON (duration, environment, safety factor, etc.).
+- Full MissionProject JSON files for round-tripping across the Architect stack.
 
 ## Export formats
 - **JSON:** Download `kitsmith_export.json` containing constraints (including safety factor), kits with totals, operator loads, sustainment flags, and a timestamp. A nested `missionProject` block mirrors the same data for downstream tools.
 - **Text checklist:** Builds a plain-text block with mission context and per-kit line items (copy to clipboard).
 - **Printable checklists:** Generates per-kit packing lists with multiple checkboxes per line item; use your browser’s print dialog to produce paper copies.
+- **ATAK/tactical package:** The ATAK zip includes the full export JSON, a MissionProject JSON, GeoJSON, and a CoT-style JSON stub. See `docs/atak_exports.md` for fields and ingest notes.
 
 ## Notes on sustainment logic
 - Safety factor: The `safetyFactor` (default 1.2x) multiplies modeled battery requirements before rounding up. Summary cards show both the raw model need and the buffered requirement so users see the margin.

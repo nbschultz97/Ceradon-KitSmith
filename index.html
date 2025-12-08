@@ -5,6 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Ceradon KitSmith</title>
   <link rel="stylesheet" href="styles.css">
+  <script src="mission_project.js"></script>
   <style>
     :root {
       font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
@@ -124,6 +125,7 @@
         <button class="nav-link" type="button" data-scroll="#inventory">Inventory</button>
         <button class="nav-link" type="button" data-scroll="#kits">Kits</button>
         <button class="nav-link" type="button" data-scroll="#summary">Summary</button>
+        <button class="nav-link" type="button" data-scroll="#packing-lists">Packing Lists</button>
         <button class="nav-link" type="button" data-scroll="#export">Export</button>
       </nav>
     </header>
@@ -278,17 +280,30 @@
         <div id="summary-content" class="stack"></div>
       </section>
 
+      <section id="packing-lists" class="panel summary-panel">
+        <div class="panel-header">
+          <div>
+            <p class="eyebrow">Step 5 · Pack &amp; assign</p>
+            <h2>Packing Lists</h2>
+          </div>
+          <div class="summary-actions">
+            <button id="add-operator" class="btn-ghost" type="button">Add Operator</button>
+            <button id="print-packing" class="btn-primary" type="button">Print Packing Lists</button>
+          </div>
+        </div>
+        <div id="packing-lists-content" class="stack"></div>
+      </section>
+
       <section id="export" class="panel summary-panel">
         <div class="panel-header">
           <div>
-            <p class="eyebrow">Step 5 · Share</p>
+            <p class="eyebrow">Step 6 · Share</p>
             <h2>Export</h2>
           </div>
           <div class="summary-actions">
             <button id="copy-checklist" class="btn-ghost" type="button">Copy Text Checklist</button>
             <button id="download-json" class="btn-ghost" type="button">Download JSON</button>
             <button id="download-atak" class="btn-primary" type="button">Download ATAK Mission Package (.zip)</button>
-            <button id="print-checklist" class="btn-primary" type="button">Printable Checklists</button>
           </div>
         </div>
         <div id="export-content" class="stack"></div>

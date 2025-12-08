@@ -673,6 +673,83 @@ legend {
   color: var(--muted);
 }
 
+.packing-section {
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 12px;
+  background: var(--card);
+}
+
+.packing-table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-top: 8px;
+  font-size: 0.95rem;
+}
+
+.packing-table th,
+.packing-table td {
+  border: 1px solid var(--border);
+  padding: 6px 8px;
+  text-align: left;
+}
+
+.packing-table th {
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--muted);
+}
+
+.packing-assignments {
+  display: grid;
+  gap: 8px;
+}
+
+.assignment-card {
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 10px;
+  background: rgba(255, 255, 255, 0.02);
+  display: grid;
+  gap: 8px;
+}
+
+.assignment-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.assignment-header .inputs {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.assignment-header input {
+  min-width: 160px;
+}
+
+.assignment-kits {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.assignment-weight {
+  font-weight: 600;
+}
+
+.assignment-over {
+  color: var(--danger);
+}
+
+.page-break {
+  page-break-after: always;
+  break-after: page;
+}
+
 @media (min-width: 640px) {
   .demo-request-actions {
     flex-direction: row;
@@ -701,5 +778,46 @@ legend {
 
   .filters, .summary-actions, .kit-footer {
     flex-wrap: wrap;
+  }
+}
+
+@media print {
+  :root {
+    --bg: #ffffff;
+    --panel: #ffffff;
+    --card: #ffffff;
+    --text: #000000;
+    --muted: #333333;
+    --border: #cccccc;
+    --shadow: none;
+  }
+
+  body {
+    background: #ffffff;
+    color: #000000;
+  }
+
+  .top-bar, .demo-request, .nav-link, .btn-primary, .btn-ghost, .filters, .kit-actions, .summary-actions, .kit-form, .preset-actions, #access-gate, #demo-request {
+    display: none !important;
+  }
+
+  .layout {
+    grid-template-columns: 1fr;
+    padding: 0;
+  }
+
+  .panel {
+    border: none;
+    box-shadow: none;
+  }
+
+  .packing-section {
+    page-break-inside: avoid;
+    break-inside: avoid;
+    margin-bottom: 16px;
+  }
+
+  .packing-section.page-break {
+    page-break-after: always;
   }
 }

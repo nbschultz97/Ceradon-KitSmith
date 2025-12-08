@@ -377,8 +377,10 @@ const fallbackInventory = [
 ];
 
 const state = {
+  project: null,
   constraints: structuredClone(defaultConstraints),
   kits: [],
+  assignments: [],
   inventory: [],
   inventoryById: {},
   presets: [],
@@ -394,12 +396,23 @@ function normalizeKitsData(kitsLike) {
   }));
 }
 
+function normalizeAssignments(assignmentsLike) {
+  if (!assignmentsLike) return [];
+  const arr = Array.isArray(assignmentsLike) ? assignmentsLike : Object.values(assignmentsLike);
+  return arr.map((entry, idx) => ({
+    id: entry.id || `op_${crypto.randomUUID ? crypto.randomUUID() : Date.now() + idx}`,
+    operator: entry.operator || entry.name || `Operator ${idx + 1}`,
+    role: entry.role || '',
+    kitIds: Array.isArray(entry.kitIds) ? entry.kitIds.filter(Boolean) : [],
+  }));
+}
+
 const elements = {
   inventoryListEl: document.getElementById('inventory-list'),
   kitsContainer: document.getElementById('kits-container'),
   summaryContent: document.getElementById('summary-content'),
   exportContent: document.getElementById('export-content'),
-  printableContent: document.createElement('div'),
+  packingListsContent: document.getElementById('packing-lists-content'),
   snapshotEl: document.getElementById('mission-snapshot'),
   inventoryCount: document.getElementById('inventory-count'),
   constraintsForm: document.getElementById('constraints-form'),
@@ -410,6 +423,8 @@ const elements = {
   categoryButtons: document.getElementById('category-buttons'),
   designImport: document.getElementById('design-import'),
   missionImport: document.getElementById('mission-import'),
+  addOperatorBtn: document.getElementById('add-operator'),
+  printPackingBtn: document.getElementById('print-packing'),
 };
 
 function structuredClone(obj) {
@@ -423,54 +438,69 @@ function formatTimestamp() {
 }
 
 function persistState() {
-  const payload = {
-    constraints: state.constraints,
-    kits: state.kits,
+  const project = state.project || loadMissionProject();
+  project.kits = project.kits || {};
+  project.kits.definitions = state.kits.map((kit) => ({ ...kit, items: { ...kit.items } }));
+  project.kits.assignments = state.assignments.map((assign) => ({ ...assign, kitIds: [...assign.kitIds] }));
+  project.sustainment = {
+    ...project.sustainment,
+    durationHours: state.constraints.durationHours,
+    environment: state.constraints.environment,
+    teamSize: state.constraints.teamSize,
+    maxWeightPerOperatorKg: state.constraints.maxWeightPerOperatorKg,
+    safetyFactor: state.constraints.safetyFactor,
+    powerStrategy: state.constraints.powerStrategy,
+    notes: state.constraints.notes,
   };
+  state.project = saveMissionProject(project);
+}
+
+function loadLegacyState() {
   try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(payload));
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if (!raw) return null;
+    return JSON.parse(raw);
   } catch (err) {
-    console.error('Persist failed', err);
+    console.warn('Legacy state unavailable', err);
+    return null;
   }
 }
 
-function showRestoreBanner(saved) {
-  const existing = document.getElementById('restore-banner');
-  if (existing) existing.remove();
-  const banner = document.createElement('div');
-  banner.id = 'restore-banner';
-  banner.className = 'restore-banner';
-  banner.innerHTML = `
-    <span>Restore previous KitSmith session?</span>
-    <div class="banner-actions">
-      <button class="btn-primary" type="button" id="restore-session">Restore</button>
-      <button class="btn-ghost" type="button" id="discard-session">Discard</button>
-    </div>
-  `;
-  document.body.prepend(banner);
-  document.getElementById('restore-session').onclick = () => {
-    state.constraints = saved.constraints || structuredClone(defaultConstraints);
-    state.kits = normalizeKitsData(saved.kits);
-    renderAll();
-    persistState();
-    banner.remove();
+function hydrateFromMissionProject() {
+  const project = loadMissionProject();
+  state.project = project;
+  const sustainment = project.sustainment || {};
+  state.constraints = {
+    ...structuredClone(defaultConstraints),
+    durationHours: sustainment.durationHours ?? defaultConstraints.durationHours,
+    environment: sustainment.environment || defaultConstraints.environment,
+    teamSize: sustainment.teamSize ?? defaultConstraints.teamSize,
+    maxWeightPerOperatorKg: sustainment.maxWeightPerOperatorKg ?? defaultConstraints.maxWeightPerOperatorKg,
+    safetyFactor: sustainment.safetyFactor ?? defaultConstraints.safetyFactor,
+    powerStrategy: { ...structuredClone(defaultConstraints.powerStrategy), ...(sustainment.powerStrategy || {}) },
+    notes: sustainment.notes || '',
   };
-  document.getElementById('discard-session').onclick = () => {
-    localStorage.removeItem(STORAGE_KEY);
-    banner.remove();
-  };
-}
 
-function checkRestore() {
-  try {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    if (!raw) return;
-    const saved = JSON.parse(raw);
-    if (saved && saved.constraints) {
-      showRestoreBanner(saved);
+  const kitsSection = project.kits || {};
+  state.kits = normalizeKitsData(kitsSection.definitions || kitsSection.kits || kitsSection);
+  state.assignments = normalizeAssignments(kitsSection.assignments);
+
+  if (!state.kits.length) {
+    const legacy = loadLegacyState();
+    if (legacy) {
+      state.constraints = { ...state.constraints, ...legacy.constraints };
+      state.kits = normalizeKitsData(legacy.kits);
+      localStorage.removeItem(STORAGE_KEY);
     }
-  } catch (err) {
-    console.warn('No restore state', err);
+  }
+
+  if (!state.assignments.length && state.kits.length) {
+    state.assignments = state.kits.map((kit, idx) => ({
+      id: `asg_${kit.id}`,
+      operator: kit.name || `Operator ${idx + 1}`,
+      role: kit.role || '',
+      kitIds: [kit.id],
+    }));
   }
 }
 
@@ -588,6 +618,7 @@ function syncConstraintForm() {
 function resetConstraintsForm() {
   state.constraints = structuredClone(defaultConstraints);
   state.kits = [];
+  state.assignments = [];
   hydrateBlank();
   syncConstraintForm();
   renderAll();
@@ -606,6 +637,12 @@ function createKitBase(name = 'New Kit', role = '') {
 function addKit(name = 'New Kit', role = '') {
   const kit = createKitBase(name, role);
   state.kits.push(kit);
+  state.assignments.push({
+    id: `asg_${kit.id}`,
+    operator: kit.name || 'Operator',
+    role: kit.role || '',
+    kitIds: [kit.id],
+  });
   renderAll();
   persistState();
   return kit.id;
@@ -614,7 +651,53 @@ function addKit(name = 'New Kit', role = '') {
 function removeKit(id) {
   if (!confirm('Remove this kit?')) return;
   state.kits = state.kits.filter((k) => k.id !== id);
+  state.assignments = state.assignments
+    .map((assignment) => ({
+      ...assignment,
+      kitIds: assignment.kitIds.filter((kid) => kid !== id),
+    }))
+    .filter((assignment) => assignment.kitIds.length > 0);
   renderAll();
+  persistState();
+}
+
+function addAssignment(name = 'Operator', role = '') {
+  const newAssignment = {
+    id: `op_${crypto.randomUUID ? crypto.randomUUID() : Date.now()}`,
+    operator: name,
+    role,
+    kitIds: [],
+  };
+  state.assignments.push(newAssignment);
+  renderPackingListsView();
+  renderSummaryPanel();
+  persistState();
+}
+
+function removeAssignment(id) {
+  state.assignments = state.assignments.filter((a) => a.id !== id);
+  renderPackingListsView();
+  renderSummaryPanel();
+  persistState();
+}
+
+function updateAssignmentField(id, field, value) {
+  state.assignments = state.assignments.map((assignment) => assignment.id === id ? { ...assignment, [field]: value } : assignment);
+  renderPackingListsView();
+  renderSummaryPanel();
+  persistState();
+}
+
+function toggleAssignmentKit(assignmentId, kitId, enabled) {
+  state.assignments = state.assignments.map((assignment) => {
+    if (assignment.id !== assignmentId) return assignment;
+    const kitIds = new Set(assignment.kitIds || []);
+    if (enabled) kitIds.add(kitId);
+    else kitIds.delete(kitId);
+    return { ...assignment, kitIds: Array.from(kitIds) };
+  }).filter((assignment) => (assignment.kitIds || []).length > 0 || assignment.id === assignmentId);
+  renderPackingListsView();
+  renderSummaryPanel();
   persistState();
 }
 
@@ -743,18 +826,38 @@ function calculateMissionReadiness() {
 
 function buildOperatorSummary() {
   const { maxWeightPerOperatorKg } = state.constraints;
-  return state.kits.map((kit, idx) => {
-    const totals = calculateKitTotals(kit);
-    const weight = totals.totalWeightKg;
+  const assignments = state.assignments.length
+    ? state.assignments
+    : state.kits.map((kit, idx) => ({ id: `asg_${kit.id}`, operator: kit.name || `Operator ${idx + 1}`, role: kit.role || '', kitIds: [kit.id] }));
+
+  return assignments.map((assignment, idx) => {
+    const kits = assignment.kitIds
+      .map((id) => state.kits.find((kit) => kit.id === id))
+      .filter(Boolean);
+    const weight = kits.reduce((sum, kit) => sum + calculateKitTotals(kit).totalWeightKg, 0);
     const over = maxWeightPerOperatorKg ? weight > maxWeightPerOperatorKg : false;
     return {
-      operator: kit.name || `Operator ${idx + 1}`,
-      role: kit.role || 'Role',
-      kits: 1,
-      totalWeightKg: weight,
+      operator: assignment.operator || `Operator ${idx + 1}`,
+      role: assignment.role || 'Role',
+      kits: kits.map((k) => k.name || 'Kit').join(', ') || 'Unassigned',
+      totalWeightKg: +weight.toFixed(2),
       overLimit: over,
     };
   });
+}
+
+function calculateAssignmentLoad(assignment) {
+  const kits = assignment.kitIds
+    .map((id) => state.kits.find((kit) => kit.id === id))
+    .filter(Boolean);
+  const totalWeight = kits.reduce((sum, kit) => sum + calculateKitTotals(kit).totalWeightKg, 0);
+  return {
+    kits,
+    totalWeightKg: +totalWeight.toFixed(2),
+    overLimit: state.constraints.maxWeightPerOperatorKg
+      ? totalWeight > state.constraints.maxWeightPerOperatorKg
+      : false,
+  };
 }
 
 function buildSustainmentTimeline() {
@@ -864,13 +967,25 @@ function renderKitsPanel() {
 
     nameInput.addEventListener('input', (e) => {
       kit.name = e.target.value;
+      state.assignments = state.assignments.map((assignment) =>
+        assignment.kitIds.includes(kit.id)
+          ? { ...assignment, operator: assignment.operator || kit.name || 'Operator', role: assignment.role || kit.role }
+          : assignment,
+      );
       renderInventoryList();
       renderSummaryPanel();
+      renderPackingListsView();
       persistState();
     });
     roleInput.addEventListener('input', (e) => {
       kit.role = e.target.value;
+      state.assignments = state.assignments.map((assignment) =>
+        assignment.kitIds.includes(kit.id)
+          ? { ...assignment, role: assignment.role || kit.role || e.target.value }
+          : assignment,
+      );
       renderSummaryPanel();
+      renderPackingListsView();
       persistState();
     });
 
@@ -1044,15 +1159,14 @@ function renderSummaryPanel() {
 function renderExportPanel() {
   const readiness = calculateMissionReadiness();
   const payload = buildExportPayload();
-  buildPrintableChecklists();
   elements.exportContent.innerHTML = `
     <div class="summary-card">
       <p class="muted">JSON export includes constraints, kits, inventory used, operator loads, safety factor, and sustainment flags.</p>
       <p class="muted">Current readiness: ${readiness.status}. Safety factor ${state.constraints.safetyFactor}x.</p>
       <p class="muted">${payload.kits.length} kits | ${payload.summary.teamWeight} kg team weight.</p>
+      <p class="muted">Packing lists and assignments save directly into the MissionProject sustainment scope.</p>
     </div>
   `;
-  elements.exportContent.appendChild(elements.printableContent);
 }
 
 function handleInventoryActions(e) {
@@ -1078,6 +1192,28 @@ function handleInventoryActions(e) {
   addItemToKit(kitId, itemId);
 }
 
+function handleAssignmentActions(e) {
+  const removeBtn = e.target.closest('.remove-assignment');
+  if (removeBtn) {
+    removeAssignment(removeBtn.dataset.assignment);
+    return;
+  }
+
+  if (e.target.classList.contains('assignment-name')) {
+    updateAssignmentField(e.target.dataset.assignment, 'operator', e.target.value);
+    return;
+  }
+
+  if (e.target.classList.contains('assignment-role')) {
+    updateAssignmentField(e.target.dataset.assignment, 'role', e.target.value);
+    return;
+  }
+
+  if (e.target.matches('input[type="checkbox"][data-assignment][data-kit]')) {
+    toggleAssignmentKit(e.target.dataset.assignment, e.target.dataset.kit, e.target.checked);
+  }
+}
+
 function hydrateBlank() {
   if (state.kits.length === 0) {
     addKit('Alpha Kit', 'Lead');
@@ -1093,6 +1229,7 @@ function applyPreset(id) {
     ...createKitBase(kit.name, kit.role),
     items: structuredClone(kit.items),
   }));
+  state.assignments = state.kits.map((kit, idx) => ({ id: `asg_${kit.id}`, operator: kit.name || `Operator ${idx + 1}`, role: kit.role || '', kitIds: [kit.id] }));
   syncConstraintForm();
   renderAll();
   persistState();
@@ -1149,26 +1286,79 @@ function copyChecklist() {
   }
 }
 
-function buildPrintableChecklists() {
-  const container = elements.printableContent;
-  container.className = 'printable-section';
+function renderPackingListsView() {
+  const container = elements.packingListsContent;
+  if (!container) return;
   if (!state.kits.length) {
-    container.innerHTML = '<p class="muted">Add kits to build a printable checklist.</p>';
+    container.innerHTML = '<p class="muted">Add kits to build packing lists.</p>';
     return;
   }
+
+  const kitSections = state.kits.map((kit) => {
+    const rows = Object.entries(kit.items).map(([itemId, qty]) => {
+      const item = state.inventoryById[itemId];
+      if (!item) return '';
+      const perWeight = typeof item.weight_g === 'number' ? `${(item.weight_g / 1000).toFixed(2)} kg` : 'N/A';
+      return `<tr><td>${item.name}</td><td>${qty}</td><td>${perWeight}</td><td>☐</td></tr>`;
+    }).join('');
+    const kitTotals = calculateKitTotals(kit);
+    return `
+      <div class="packing-section page-break">
+        <h3>${kit.name || 'Kit'} — ${kit.role || 'Role'}</h3>
+        <p class="muted">Total weight: ${kitTotals.totalWeightKg} kg | Batteries: ${kitTotals.batteryCount}</p>
+        <table class="packing-table">
+          <thead><tr><th>Item</th><th>Qty</th><th>Weight (each)</th><th>Check</th></tr></thead>
+          <tbody>${rows || '<tr><td colspan="4">No items</td></tr>'}</tbody>
+        </table>
+      </div>
+    `;
+  }).join('');
+
+  const operatorSummary = buildOperatorSummary();
+  const operatorTable = operatorSummary.length
+    ? `<table class="packing-table">
+        <thead><tr><th>Operator</th><th>Role</th><th>Kits</th><th>Total weight</th><th>Limit</th></tr></thead>
+        <tbody>
+          ${operatorSummary.map((op) => `<tr class="${op.overLimit ? 'status-row-red' : ''}"><td>${op.operator}</td><td>${op.role}</td><td>${op.kits}</td><td>${op.totalWeightKg} kg</td><td>${op.overLimit ? 'Over' : 'OK'}</td></tr>`).join('')}
+        </tbody>
+      </table>`
+    : '<p class="muted">No operators assigned.</p>';
+
+  const assignments = state.assignments.length
+    ? state.assignments.map((assignment) => {
+        const load = calculateAssignmentLoad(assignment);
+        const kitCheckboxes = state.kits.length
+          ? state.kits.map((kit) => `<label class="checkbox"><input type="checkbox" data-assignment="${assignment.id}" data-kit="${kit.id}" ${assignment.kitIds.includes(kit.id) ? 'checked' : ''}/> ${kit.name || 'Kit'}</label>`).join('')
+          : '<p class="muted">No kits available.</p>';
+        return `
+          <div class="assignment-card" data-assignment="${assignment.id}">
+            <div class="assignment-header">
+              <div class="inputs">
+                <input type="text" class="assignment-name" data-assignment="${assignment.id}" value="${assignment.operator || ''}" placeholder="Operator" />
+                <input type="text" class="assignment-role" data-assignment="${assignment.id}" value="${assignment.role || ''}" placeholder="Role" />
+              </div>
+              <button class="btn-ghost remove-assignment" type="button" data-assignment="${assignment.id}">Remove</button>
+            </div>
+            <div class="assignment-kits">${kitCheckboxes}</div>
+            <div class="assignment-weight ${load.overLimit ? 'assignment-over' : ''}">Load: ${load.totalWeightKg} kg${state.constraints.maxWeightPerOperatorKg ? ` / ${state.constraints.maxWeightPerOperatorKg} kg max` : ''}</div>
+          </div>
+        `;
+      }).join('')
+    : '<p class="muted">Add operators to assign kits and monitor load limits.</p>';
+
   container.innerHTML = `
-    <div class="summary-card">
-      <h3>Printable checklists</h3>
-      <p class="muted">One section per kit. Use browser print to produce paper copies.</p>
+    <div class="packing-section">
+      <h3>Per-kit packing lists</h3>
+      <p class="muted">Use browser print for paper-ready checklists. Safety factor ${state.constraints.safetyFactor}x applied to consumables.</p>
+      ${kitSections}
     </div>
-    ${state.kits.map((kit) => {
-      const items = Object.entries(kit.items).map(([itemId, qty]) => {
-        const item = state.inventoryById[itemId];
-        if (!item) return '';
-        return `<li><span>${item.name}</span><span class="qty">${qty}x</span><span class="checkboxes">☐ ☐ ☐</span></li>`;
-      }).join('');
-      return `<div class="print-card"><h4>${kit.name || 'Kit'} — ${kit.role || 'Role'}</h4><ul class="print-list">${items || '<li>No items</li>'}</ul></div>`;
-    }).join('')}
+    <div class="packing-section">
+      <h3>Operator assignments</h3>
+      <p class="muted">Max carry weight ${state.constraints.maxWeightPerOperatorKg || 'N/A'} kg. Highlighted rows exceed the limit.</p>
+      <div class="packing-assignments">${assignments}</div>
+      <h4>Operator loads</h4>
+      ${operatorTable}
+    </div>
   `;
 }
 
@@ -1192,6 +1382,7 @@ function buildExportPayload() {
   return {
     constraints: state.constraints,
     kits: kitsWithTotals,
+    assignments: state.assignments,
     inventoryUsed,
     summary: calculateTeamSummary(),
     readiness: calculateMissionReadiness(),
@@ -1199,6 +1390,7 @@ function buildExportPayload() {
     sustainment,
     missionProject: {
       kitDefinitions: kitsWithTotals,
+      operatorAssignments: state.assignments,
       operatorLoads: buildOperatorSummary(),
       sustainment,
     },
@@ -1290,7 +1482,7 @@ function handleCategoryClick(e) {
 }
 
 function handleNavScroll() {
-  const sections = ['constraints', 'inventory', 'kits', 'summary', 'export'].map((id) => document.getElementById(id));
+  const sections = ['constraints', 'inventory', 'kits', 'summary', 'packing-lists', 'export'].map((id) => document.getElementById(id));
   const scrollPos = document.documentElement.scrollTop || document.body.scrollTop;
   const offset = 120;
   let activeId = 'constraints';
@@ -1309,18 +1501,19 @@ function renderAll() {
   renderInventoryList();
   renderKitsPanel();
   renderSummaryPanel();
+  renderPackingListsView();
   handleNavScroll();
 }
 
 async function init() {
   renderCategoryButtons();
   attachEvents();
+  hydrateFromMissionProject();
   await loadPresets();
   await loadInventory();
   hydrateBlank();
   syncConstraintForm();
   renderAll();
-  checkRestore();
 }
 
 function attachEvents() {
@@ -1336,10 +1529,11 @@ function attachEvents() {
   document.getElementById('copy-checklist').addEventListener('click', copyChecklist);
   document.getElementById('download-json').addEventListener('click', downloadJSON);
   document.getElementById('download-atak').addEventListener('click', exportAtakMissionPackage);
-  document.getElementById('print-checklist').addEventListener('click', () => {
-    buildPrintableChecklists();
-    window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' });
-  });
+  elements.addOperatorBtn.addEventListener('click', () => addAssignment('Operator', ''));
+  elements.printPackingBtn.addEventListener('click', () => window.print());
+  elements.packingListsContent.addEventListener('input', handleAssignmentActions);
+  elements.packingListsContent.addEventListener('change', handleAssignmentActions);
+  elements.packingListsContent.addEventListener('click', handleAssignmentActions);
   document.getElementById('demo-recon').addEventListener('click', () => applyPreset('recon24'));
   document.getElementById('demo-uxs').addEventListener('click', () => applyPreset('uxs48'));
   elements.designImport.addEventListener('change', () => handleFileImport(elements.designImport, importDesigns));

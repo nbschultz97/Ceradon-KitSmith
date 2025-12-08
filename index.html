@@ -8,12 +8,16 @@
 </head>
 <body>
   <header class="top-bar">
-    <div class="brand">Ceradon KitSmith</div>
+    <div class="brand">
+      <div class="brand-title">Ceradon KitSmith</div>
+      <p class="brand-subtitle">Kit & sustainment planner</p>
+    </div>
     <nav class="top-nav">
-      <a href="#constraints">Constraints</a>
-      <a href="#inventory">Inventory</a>
-      <a href="#kits">Kits</a>
-      <a href="#export">Export</a>
+      <button class="nav-link" type="button" data-scroll="#constraints">Constraints</button>
+      <button class="nav-link" type="button" data-scroll="#inventory">Inventory</button>
+      <button class="nav-link" type="button" data-scroll="#kits">Kits</button>
+      <button class="nav-link" type="button" data-scroll="#summary">Summary</button>
+      <button class="nav-link" type="button" data-scroll="#export">Export</button>
     </nav>
   </header>
 
@@ -24,57 +28,77 @@
           <p class="eyebrow">Mission inputs</p>
           <h2>Constraints</h2>
         </div>
-        <button id="reset-constraints" class="btn-ghost" type="button">Reset</button>
+        <div class="preset-actions">
+          <button id="demo-recon" class="btn-ghost" type="button">Load 24h Recon Patrol</button>
+          <button id="demo-uxs" class="btn-ghost" type="button">Load 48h UxS-Heavy Mission</button>
+          <button id="reset-constraints" class="btn-ghost" type="button">Reset to Blank</button>
+        </div>
       </div>
       <form id="constraints-form" class="form-grid">
-        <label>
-          Mission Duration
-          <select name="durationHours">
-            <option value="12">12 hrs</option>
-            <option value="24" selected>24 hrs</option>
-            <option value="48">48 hrs</option>
-            <option value="72">72 hrs</option>
-          </select>
-        </label>
-        <label>
-          Environment
-          <select name="environment">
-            <option value="Urban">Urban</option>
-            <option value="Rural">Rural</option>
-            <option value="Mountain">Mountain</option>
-            <option value="Arctic">Arctic</option>
-            <option value="Maritime">Maritime</option>
-            <option value="Desert">Desert</option>
-          </select>
-        </label>
-        <label>
-          Team Size
-          <input type="number" name="teamSize" min="1" value="4" />
-        </label>
-        <label>
-          Max Weight per Operator (kg)
-          <input type="number" step="0.5" min="0" name="maxWeightPerOperatorKg" value="22" />
-        </label>
-        <fieldset class="stack">
-          <legend>Power Strategy</legend>
-          <label class="checkbox">
-            <input type="checkbox" name="powerExternal" />
-            External charging available
-          </label>
-          <label class="checkbox">
-            <input type="checkbox" name="powerGenerator" />
-            Bring generator
-          </label>
-          <label class="checkbox">
-            <input type="checkbox" name="powerBatteryOnly" checked />
-            Battery-only
-          </label>
-        </fieldset>
-        <label class="full-width">
-          Notes
-          <textarea name="notes" rows="3" placeholder="Lane, AO, remarks..."></textarea>
-        </label>
+        <div class="subsection">
+          <p class="eyebrow">Mission profile</p>
+          <div class="form-grid">
+            <label>
+              Mission Duration
+              <select name="durationHours">
+                <option value="12">12 hrs</option>
+                <option value="24" selected>24 hrs</option>
+                <option value="48">48 hrs</option>
+                <option value="72">72 hrs</option>
+              </select>
+            </label>
+            <label>
+              Environment
+              <select name="environment">
+                <option value="Urban">Urban</option>
+                <option value="Rural">Rural</option>
+                <option value="Mountain">Mountain</option>
+                <option value="Arctic">Arctic</option>
+                <option value="Maritime">Maritime</option>
+                <option value="Desert">Desert</option>
+              </select>
+            </label>
+          </div>
+        </div>
+        <div class="subsection">
+          <p class="eyebrow">Team</p>
+          <div class="form-grid">
+            <label>
+              Team Size
+              <input type="number" name="teamSize" min="1" value="4" />
+            </label>
+            <label>
+              Max Weight per Operator (kg)
+              <input type="number" step="0.5" min="0" name="maxWeightPerOperatorKg" value="22" />
+            </label>
+          </div>
+        </div>
+        <div class="subsection">
+          <p class="eyebrow">Limits & power</p>
+          <div class="form-grid">
+            <fieldset class="stack">
+              <legend>Power Strategy</legend>
+              <label class="checkbox">
+                <input type="checkbox" name="powerExternal" />
+                External charging available
+              </label>
+              <label class="checkbox">
+                <input type="checkbox" name="powerGenerator" />
+                Bring generator
+              </label>
+              <label class="checkbox">
+                <input type="checkbox" name="powerBatteryOnly" checked />
+                Battery-only
+              </label>
+            </fieldset>
+            <label class="full-width">
+              Notes
+              <textarea name="notes" rows="3" placeholder="Lane, AO, remarks..."></textarea>
+            </label>
+          </div>
+        </div>
       </form>
+      <div class="snapshot" id="mission-snapshot" aria-live="polite"></div>
     </section>
 
     <section id="inventory" class="panel">
@@ -83,7 +107,7 @@
           <p class="eyebrow">Loadout source</p>
           <h2>Inventory</h2>
         </div>
-        <div class="filters">
+        <div class="filters sticky-filter">
           <select id="filter-category">
             <option value="all">All Categories</option>
             <option value="Battery">Battery</option>
@@ -95,6 +119,7 @@
             <option value="Other">Other</option>
           </select>
           <input id="filter-text" type="search" placeholder="Search name or tag" />
+          <div id="inventory-count" class="muted"></div>
         </div>
       </div>
       <div id="inventory-list" class="card-grid" aria-live="polite"></div>
@@ -111,18 +136,28 @@
       <div id="kits-container" class="stack"></div>
     </section>
 
-    <section id="export" class="panel summary-panel">
+    <section id="summary" class="panel summary-panel">
       <div class="panel-header">
         <div>
           <p class="eyebrow">Rollup</p>
-          <h2>Summary & Export</h2>
+          <h2>Summary</h2>
+        </div>
+      </div>
+      <div id="summary-content" class="stack"></div>
+    </section>
+
+    <section id="export" class="panel summary-panel">
+      <div class="panel-header">
+        <div>
+          <p class="eyebrow">Share</p>
+          <h2>Export</h2>
         </div>
         <div class="summary-actions">
           <button id="copy-checklist" class="btn-ghost" type="button">Copy Text Checklist</button>
           <button id="download-json" class="btn-primary" type="button">Download JSON</button>
         </div>
       </div>
-      <div id="summary-content" class="stack"></div>
+      <div id="export-content" class="stack"></div>
     </section>
   </main>
 
@@ -133,16 +168,32 @@
           <input class="kit-name" type="text" aria-label="Kit name" />
           <input class="kit-role" type="text" aria-label="Kit role" placeholder="Role" />
         </div>
-        <button class="btn-ghost remove-kit" type="button">Remove</button>
+        <div class="kit-status">
+          <span class="badge status-badge">Status</span>
+          <button class="btn-ghost remove-kit" type="button">Remove</button>
+        </div>
       </div>
       <div class="kit-body">
+        <div class="kit-stats">
+          <div class="stat-block">
+            <p class="muted">Weight</p>
+            <div class="stat-value"><span class="kit-weight">0</span> kg</div>
+          </div>
+          <div class="stat-block">
+            <p class="muted">Energy</p>
+            <div class="stat-value"><span class="kit-energy">0</span> Wh</div>
+          </div>
+          <div class="stat-block">
+            <p class="muted">Runtime</p>
+            <div class="stat-value kit-runtime">--</div>
+          </div>
+        </div>
         <ul class="kit-items"></ul>
         <p class="kit-empty">No items yet. Add from inventory.</p>
       </div>
-      <div class="kit-footer">
-        <div class="badge">Weight: <span class="kit-weight">0</span> kg</div>
-        <div class="badge">Energy: <span class="kit-energy">0</span> Wh</div>
-        <div class="badge runtime"><span class="kit-runtime">Runtime: --</span></div>
+      <div class="kit-footer">        
+        <div class="badge badge-ghost kit-weight-badge">Weight status</div>
+        <div class="badge badge-ghost kit-power-badge">Power status</div>
       </div>
     </div>
   </template>

@@ -1,0 +1,149 @@
+[
+  {
+    "id": "recon24",
+    "label": "Load 24h Recon Patrol",
+    "constraints": {
+      "durationHours": 24,
+      "environment": "Mountain",
+      "teamSize": 4,
+      "maxWeightPerOperatorKg": 28,
+      "powerStrategy": {
+        "powerExternal": false,
+        "powerGenerator": false,
+        "powerBatteryOnly": true
+      },
+      "notes": "24h route recon. Low signature. Battery-only."
+    },
+    "kits": [
+      {
+        "name": "Team Leader",
+        "role": "Lead",
+        "items": {
+          "bat_98wh_brick": 1,
+          "radio_harris_152": 1,
+          "radio_rto_headset": 1,
+          "sustain_mre": 1,
+          "sustain_water_blader": 1,
+          "tool_multitool": 1
+        }
+      },
+      {
+        "name": "RTO",
+        "role": "Communications",
+        "items": {
+          "bat_98wh_brick": 2,
+          "radio_harris_152": 1,
+          "radio_rto_headset": 1,
+          "node_vantage_edge": 1,
+          "tool_tripod": 1,
+          "sustain_mre": 1,
+          "sustain_water_blader": 1
+        }
+      },
+      {
+        "name": "Scout",
+        "role": "ISR",
+        "items": {
+          "uxs_quadcopter_scout": 1,
+          "bat_4s_5000": 3,
+          "tool_multitool": 1,
+          "sustain_mre": 1,
+          "sustain_water_blader": 1
+        }
+      },
+      {
+        "name": "Support",
+        "role": "Security",
+        "items": {
+          "sustain_mre": 1,
+          "sustain_water_blader": 1,
+          "tool_multitool": 1
+        }
+      }
+    ]
+  },
+  {
+    "id": "uxs48",
+    "label": "Load 48h UxS-Heavy Mission",
+    "constraints": {
+      "durationHours": 48,
+      "environment": "Urban",
+      "teamSize": 6,
+      "maxWeightPerOperatorKg": 26,
+      "powerStrategy": {
+        "powerExternal": true,
+        "powerGenerator": true,
+        "powerBatteryOnly": false
+      },
+      "notes": "48h contested urban. Heavy UxS and relay support."
+    },
+    "kits": [
+      {
+        "name": "Team Leader",
+        "role": "C2",
+        "items": {
+          "bat_98wh_brick": 2,
+          "radio_harris_152": 1,
+          "radio_rto_headset": 1,
+          "node_vantage_edge": 1,
+          "sustain_mre": 2,
+          "sustain_water_blader": 1
+        }
+      },
+      {
+        "name": "RTO",
+        "role": "Mesh",
+        "items": {
+          "bat_98wh_brick": 2,
+          "bat_240wh_station": 1,
+          "radio_harris_152": 1,
+          "node_vantage_edge": 1,
+          "power_solar_fold": 1,
+          "sustain_mre": 2,
+          "sustain_water_blader": 1
+        }
+      },
+      {
+        "name": "UAS Operator",
+        "role": "Air",
+        "items": {
+          "uxs_quadcopter_scout": 1,
+          "bat_4s_5000": 4,
+          "bat_98wh_brick": 1,
+          "sustain_mre": 2,
+          "sustain_water_blader": 1
+        }
+      },
+      {
+        "name": "Support 1",
+        "role": "Security",
+        "items": {
+          "sustain_mre": 2,
+          "sustain_water_blader": 1,
+          "tool_multitool": 1,
+          "tool_tripod": 1
+        }
+      },
+      {
+        "name": "Support 2",
+        "role": "Security",
+        "items": {
+          "sustain_mre": 2,
+          "sustain_water_blader": 1,
+          "tool_multitool": 1
+        }
+      },
+      {
+        "name": "Power Manager",
+        "role": "Generator",
+        "items": {
+          "bat_240wh_station": 1,
+          "other_batterycharger": 1,
+          "power_solar_fold": 1,
+          "sustain_mre": 2,
+          "sustain_water_blader": 1
+        }
+      }
+    ]
+  }
+]

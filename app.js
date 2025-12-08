@@ -377,21 +377,45 @@ const fallbackInventory = [
 
 const state = {
   constraints: structuredClone(defaultConstraints),
-  kits: {},
+  kits: [],
   inventory: [],
   inventoryById: {},
   presets: [],
 };
 
-const inventoryListEl = document.getElementById('inventory-list');
-const kitsContainer = document.getElementById('kits-container');
-const summaryContent = document.getElementById('summary-content');
-const exportContent = document.getElementById('export-content');
-const snapshotEl = document.getElementById('mission-snapshot');
-const inventoryCount = document.getElementById('inventory-count');
+function normalizeKitsData(kitsLike) {
+  if (!kitsLike) return [];
+  const arr = Array.isArray(kitsLike) ? kitsLike : Object.values(kitsLike);
+  return arr.map((kit) => ({
+    ...kit,
+    id: kit.id || `kit_${crypto.randomUUID ? crypto.randomUUID() : Date.now()}`,
+    items: kit.items || {},
+  }));
+}
+
+const elements = {
+  inventoryListEl: document.getElementById('inventory-list'),
+  kitsContainer: document.getElementById('kits-container'),
+  summaryContent: document.getElementById('summary-content'),
+  exportContent: document.getElementById('export-content'),
+  snapshotEl: document.getElementById('mission-snapshot'),
+  inventoryCount: document.getElementById('inventory-count'),
+  constraintsForm: document.getElementById('constraints-form'),
+  kitForm: document.getElementById('kit-form'),
+  kitNameInput: document.getElementById('kit-name-input'),
+  kitRoleInput: document.getElementById('kit-role-input'),
+  clipboardStatus: document.getElementById('clipboard-status'),
+  categoryButtons: document.getElementById('category-buttons'),
+};
 
 function structuredClone(obj) {
   return JSON.parse(JSON.stringify(obj));
+}
+
+function formatTimestamp() {
+  const now = new Date();
+  const pad = (n) => `${n}`.padStart(2, '0');
+  return `${now.getFullYear()}${pad(now.getMonth() + 1)}${pad(now.getDate())}_${pad(now.getHours())}${pad(now.getMinutes())}`;
 }
 
 function persistState() {
@@ -413,7 +437,7 @@ function showRestoreBanner(saved) {
   banner.id = 'restore-banner';
   banner.className = 'restore-banner';
   banner.innerHTML = `
-    <span>Restore previous session?</span>
+    <span>Restore previous KitSmith session?</span>
     <div class="banner-actions">
       <button class="btn-primary" type="button" id="restore-session">Restore</button>
       <button class="btn-ghost" type="button" id="discard-session">Discard</button>
@@ -422,8 +446,9 @@ function showRestoreBanner(saved) {
   document.body.prepend(banner);
   document.getElementById('restore-session').onclick = () => {
     state.constraints = saved.constraints || structuredClone(defaultConstraints);
-    state.kits = saved.kits || {};
+    state.kits = normalizeKitsData(saved.kits);
     renderAll();
+    persistState();
     banner.remove();
   };
   document.getElementById('discard-session').onclick = () => {
@@ -452,13 +477,11 @@ async function loadInventory() {
     const data = await res.json();
     state.inventory = data;
     state.inventoryById = Object.fromEntries(data.map((item) => [item.id, item]));
-    renderInventoryList();
   } catch (err) {
     console.error(err);
     state.inventory = fallbackInventory;
     state.inventoryById = Object.fromEntries(fallbackInventory.map((item) => [item.id, item]));
-    inventoryListEl.innerHTML = '<p class="muted">Inventory failed to load from /data. Using embedded fallback catalog.</p>';
-    renderInventoryList();
+    elements.inventoryListEl.innerHTML = '<p class="muted">Inventory failed to load from /data. Using embedded fallback catalog.</p>';
   }
 }
 
@@ -474,8 +497,7 @@ async function loadPresets() {
 }
 
 function updateConstraintsFromForm() {
-  const form = document.getElementById('constraints-form');
-  const formData = new FormData(form);
+  const formData = new FormData(elements.constraintsForm);
   state.constraints.durationHours = Number(formData.get('durationHours')) || 0;
   state.constraints.environment = formData.get('environment') || 'Urban';
   state.constraints.teamSize = Number(formData.get('teamSize')) || 0;
@@ -490,47 +512,63 @@ function updateConstraintsFromForm() {
   persistState();
 }
 
+function syncConstraintForm() {
+  const form = elements.constraintsForm;
+  form.durationHours.value = state.constraints.durationHours;
+  form.environment.value = state.constraints.environment;
+  form.teamSize.value = state.constraints.teamSize;
+  form.maxWeightPerOperatorKg.value = state.constraints.maxWeightPerOperatorKg;
+  form.powerExternal.checked = !!state.constraints.powerStrategy.powerExternal;
+  form.powerGenerator.checked = !!state.constraints.powerStrategy.powerGenerator;
+  form.powerBatteryOnly.checked = !!state.constraints.powerStrategy.powerBatteryOnly;
+  form.notes.value = state.constraints.notes || '';
+}
+
 function resetConstraintsForm() {
-  const form = document.getElementById('constraints-form');
-  form.reset();
   state.constraints = structuredClone(defaultConstraints);
-  state.kits = {};
-  addKit('Alpha Kit', '');
+  state.kits = [];
+  hydrateBlank();
+  syncConstraintForm();
   renderAll();
   persistState();
 }
 
-function addKit(name = 'New Kit', role = '') {
-  const id = `kit_${crypto.randomUUID ? crypto.randomUUID() : Date.now()}`;
-  state.kits[id] = {
-    id,
+function createKitBase(name = 'New Kit', role = '') {
+  return {
+    id: `kit_${crypto.randomUUID ? crypto.randomUUID() : Date.now()}`,
     name,
     role,
     items: {},
   };
+}
+
+function addKit(name = 'New Kit', role = '') {
+  const kit = createKitBase(name, role);
+  state.kits.push(kit);
   renderAll();
   persistState();
-  return id;
+  return kit.id;
 }
 
 function removeKit(id) {
-  delete state.kits[id];
+  if (!confirm('Remove this kit?')) return;
+  state.kits = state.kits.filter((k) => k.id !== id);
   renderAll();
   persistState();
 }
 
 function addItemToKit(kitId, itemId) {
-  const kit = state.kits[kitId];
+  const kit = state.kits.find((k) => k.id === kitId);
   if (!kit) return;
   kit.items[itemId] = (kit.items[itemId] || 0) + 1;
   renderAll();
   persistState();
 }
 
-function removeItemFromKit(kitId, itemId) {
-  const kit = state.kits[kitId];
+function adjustItemQuantity(kitId, itemId, delta) {
+  const kit = state.kits.find((k) => k.id === kitId);
   if (!kit || !kit.items[itemId]) return;
-  kit.items[itemId] -= 1;
+  kit.items[itemId] += delta;
   if (kit.items[itemId] <= 0) delete kit.items[itemId];
   renderAll();
   persistState();
@@ -554,46 +592,47 @@ function calculateKitTotals(kit) {
   };
 }
 
-function getBaselineWhPerHour(kit) {
-  const hasUxS = Object.keys(kit.items).some((id) => state.inventoryById[id]?.category === 'UxS');
-  const hasNode = Object.keys(kit.items).some((id) => state.inventoryById[id]?.category === 'Node');
-  const hasRadio = Object.keys(kit.items).some((id) => state.inventoryById[id]?.category === 'Radio');
-  if (hasUxS || hasNode) return 20;
-  if (hasRadio) return 12;
-  return 10;
-}
-
-function estimateRuntimeCoverage(kit) {
-  const baselineWhPerHour = getBaselineWhPerHour(kit);
-  const { durationHours } = state.constraints;
-  const { totalEnergyWh } = calculateKitTotals(kit);
-  const coverage = totalEnergyWh / (baselineWhPerHour * durationHours || 1);
-  const pct = Math.min(100, Math.round(coverage * 100));
+function kitPowerProfile(kit) {
+  const hasRfUxS = Object.keys(kit.items).some((id) => {
+    const cat = state.inventoryById[id]?.category;
+    return cat === 'Radio' || cat === 'UxS' || cat === 'Node';
+  });
+  const baselineWhPerHour = hasRfUxS ? 15 : 8;
+  const requiredWh = baselineWhPerHour * (state.constraints.durationHours || 0);
+  const totals = calculateKitTotals(kit);
+  const coverage = requiredWh > 0 ? totals.totalEnergyWh / requiredWh : 0;
   return {
     baselineWhPerHour,
-    coveragePercent: pct,
-    label: `${pct}% of ${durationHours}h requirement`,
+    requiredWh,
+    coverage,
+    status: totals.totalEnergyWh >= requiredWh ? 'Power OK' : 'Power shortfall likely',
+  };
+}
+
+function kitWeightStatus(kit) {
+  const totals = calculateKitTotals(kit);
+  const limit = state.constraints.maxWeightPerOperatorKg || 0;
+  const over = limit > 0 && totals.totalWeightKg > limit;
+  return {
+    totals,
+    over,
+    status: over ? 'Over limit' : 'Within limit',
   };
 }
 
 function kitStatus(kit) {
-  const totals = calculateKitTotals(kit);
-  const { maxWeightPerOperatorKg, durationHours } = state.constraints;
-  const weightLimit = maxWeightPerOperatorKg || 0;
-  const overWeight = weightLimit > 0 && totals.totalWeightKg > weightLimit;
-  const runtime = estimateRuntimeCoverage(kit);
-  const needed = runtime.baselineWhPerHour * durationHours;
-  const powerShortfall = totals.totalEnergyWh < needed;
+  const weight = kitWeightStatus(kit);
+  const power = kitPowerProfile(kit);
   return {
-    totals,
-    overWeight,
-    powerShortfall,
-    runtime,
+    totals: weight.totals,
+    overWeight: weight.over,
+    powerShortfall: power.status !== 'Power OK',
+    runtime: power,
   };
 }
 
 function calculateTeamSummary() {
-  const kits = Object.values(state.kits);
+  const kits = state.kits;
   const totals = kits.map((kit) => calculateKitTotals(kit));
   const teamWeight = totals.reduce((sum, t) => sum + t.totalWeightKg, 0);
   const avgWeight = kits.length ? +(teamWeight / kits.length).toFixed(2) : 0;
@@ -619,8 +658,8 @@ function calculateTeamSummary() {
 }
 
 function calculateMissionReadiness() {
-  const kits = Object.values(state.kits);
-  if (!kits.length) return { percentWithin: 0, status: 'AMBER – Add kits' };
+  const kits = state.kits;
+  if (!kits.length) return { percentWithin: 0, status: 'AMBER – Add kits', within: 0, total: 0 };
   const { maxWeightPerOperatorKg } = state.constraints;
   const within = kits.filter((kit) => {
     const totals = calculateKitTotals(kit);
@@ -629,12 +668,19 @@ function calculateMissionReadiness() {
   const percentWithin = Math.round((within / kits.length) * 100);
   let status = 'AMBER – Some kits over limit';
   if (percentWithin === 100) status = 'GREEN – All kits within limits';
-  else if (percentWithin <= 40) status = 'RED – Most kits over limit';
+  else if (percentWithin < 50) status = 'RED – Most kits over limit';
   return { percentWithin, status, within, total: kits.length };
 }
 
+function renderMissionSnapshot() {
+  const { durationHours, environment, teamSize, maxWeightPerOperatorKg, powerStrategy } = state.constraints;
+  const power = powerStrategy.powerExternal ? 'External' : powerStrategy.powerGenerator ? 'Generator' : 'Battery-only';
+  elements.snapshotEl.textContent = `${durationHours}h | ${environment} | ${teamSize} operators | ${maxWeightPerOperatorKg} kg cap | ${power}`;
+}
+
 function renderInventoryList() {
-  const categoryFilter = document.getElementById('filter-category').value;
+  const categoryFilterBtn = document.querySelector('.filter-button.active');
+  const categoryFilter = categoryFilterBtn ? categoryFilterBtn.dataset.category : 'all';
   const textFilter = document.getElementById('filter-text').value.toLowerCase();
 
   const filtered = state.inventory.filter((item) => {
@@ -645,19 +691,22 @@ function renderInventoryList() {
     return matchesCategory && matchesText;
   });
 
-  inventoryCount.textContent = `Showing ${filtered.length} of ${state.inventory.length} items`;
+  elements.inventoryCount.textContent = `Showing ${filtered.length} of ${state.inventory.length} items`;
 
   if (!filtered.length) {
-    inventoryListEl.innerHTML = '<p class="muted">No inventory matches.</p>';
+    elements.inventoryListEl.innerHTML = '<p class="muted">No inventory matches.</p>';
     return;
   }
 
-  inventoryListEl.innerHTML = filtered.map((item) => {
+  const kitOptions = state.kits.map((kit) => `<option value="${kit.id}">${kit.name || 'Kit'}</option>`).join('');
+  const hasKits = state.kits.length > 0;
+
+  elements.inventoryListEl.innerHTML = filtered.map((item) => {
     const tags = (item.tags || []).map((tag) => `<span class="pill">${tag}</span>`).join('');
-    const kitsOptions = Object.values(state.kits)
-      .map((kit) => `<option value="${kit.id}">${kit.name || 'Kit'}</option>`)
-      .join('');
     const energy = typeof item.energy_wh === 'number' ? `${item.energy_wh} Wh` : 'N/A';
+    const kitSelect = hasKits ? `<select data-item="${item.id}" class="kit-target">${kitOptions}<option value="__new__">+ New kit</option></select>` : '';
+    const addButton = hasKits ? `<button class="btn-primary add-to-kit" data-item="${item.id}">Add to Kit</button>` : '';
+    const noKitMessage = hasKits ? '' : '<div class="notice">No kits yet. Create the first kit to add items.</div>';
     return `
       <article class="card">
         <header class="card-header">
@@ -673,12 +722,10 @@ function renderInventoryList() {
         </div>
         <p class="muted">${item.notes || ''}</p>
         <div class="badges">${tags}</div>
+        ${noKitMessage}
         <div class="add-row">
-          <select data-item="${item.id}" class="kit-target">
-            ${kitsOptions || ''}
-            <option value="__new__">+ New kit</option>
-          </select>
-          <button class="btn-primary add-to-kit" data-item="${item.id}">Add to Kit</button>
+          ${kitSelect}
+          ${addButton}
         </div>
       </article>
     `;
@@ -686,10 +733,10 @@ function renderInventoryList() {
 }
 
 function renderKitsPanel() {
-  kitsContainer.innerHTML = '';
+  elements.kitsContainer.innerHTML = '';
   const template = document.getElementById('kit-template');
 
-  Object.values(state.kits).forEach((kit) => {
+  state.kits.forEach((kit) => {
     const clone = template.content.cloneNode(true);
     const nameInput = clone.querySelector('.kit-name');
     const roleInput = clone.querySelector('.kit-role');
@@ -714,7 +761,7 @@ function renderKitsPanel() {
     const empty = clone.querySelector('.kit-empty');
 
     const entries = Object.entries(kit.items);
-    if (entries.length === 0) {
+    if (!entries.length) {
       empty.style.display = 'block';
     } else {
       empty.style.display = 'none';
@@ -724,18 +771,15 @@ function renderKitsPanel() {
         const li = document.createElement('li');
         li.innerHTML = `
           <div>
-            <div>${item.name}</div>
+            <strong>${item.name}</strong>
             <p class="muted">${item.category}</p>
           </div>
           <div class="qty">
-            <button class="btn-ghost" type="button">-</button>
+            <button class="btn-ghost qty-down" data-kit="${kit.id}" data-item="${itemId}">-</button>
             <span>${qty}</span>
-            <button class="btn-ghost" type="button">+</button>
+            <button class="btn-ghost qty-up" data-kit="${kit.id}" data-item="${itemId}">+</button>
           </div>
         `;
-        const [minus, plus] = li.querySelectorAll('button');
-        minus.addEventListener('click', () => removeItemFromKit(kit.id, itemId));
-        plus.addEventListener('click', () => addItemToKit(kit.id, itemId));
         itemsList.appendChild(li);
       });
     }
@@ -747,18 +791,16 @@ function renderKitsPanel() {
     const powerBadge = clone.querySelector('.kit-power-badge');
 
     if (status.overWeight) {
-      card.classList.add('warning');
-      statusBadge.textContent = '⚠ Over weight limit';
+      card.classList.add('status-red-card');
+      statusBadge.textContent = 'Over weight limit';
       statusBadge.classList.add('badge-danger');
-      weightBadge.textContent = `Over limit (${status.totals.totalWeightKg} kg vs ${state.constraints.maxWeightPerOperatorKg} kg)`;
+      weightBadge.textContent = `Over limit (${status.totals.totalWeightKg} kg / ${state.constraints.maxWeightPerOperatorKg} kg)`;
       weightBadge.classList.add('badge-danger');
     } else {
-      card.classList.remove('warning');
+      card.classList.add('status-green-card');
       statusBadge.textContent = 'Within limit';
-      statusBadge.classList.remove('badge-danger');
       statusBadge.classList.add('badge-success');
-      weightBadge.textContent = `Within limit (${status.totals.totalWeightKg} kg)`;
-      weightBadge.classList.remove('badge-danger');
+      weightBadge.textContent = `Within limit (${status.totals.totalWeightKg} kg / ${state.constraints.maxWeightPerOperatorKg} kg)`;
       weightBadge.classList.add('badge-success');
     }
 
@@ -766,20 +808,17 @@ function renderKitsPanel() {
       powerBadge.textContent = 'Power shortfall likely';
       powerBadge.classList.add('badge-danger');
     } else {
-      powerBadge.textContent = 'Power coverage OK';
-      powerBadge.classList.remove('badge-danger');
+      powerBadge.textContent = 'Power OK';
       powerBadge.classList.add('badge-success');
     }
 
     clone.querySelector('.kit-weight').textContent = status.totals.totalWeightKg;
     clone.querySelector('.kit-energy').textContent = status.totals.totalEnergyWh;
-    clone.querySelector('.kit-runtime').textContent = status.runtime.label;
+    const runtimePct = Math.min(100, Math.round(status.runtime.coverage * 100));
+    clone.querySelector('.kit-runtime').textContent = `${runtimePct}% of ${state.constraints.durationHours}h requirement`;
 
-    kitsContainer.appendChild(clone);
+    elements.kitsContainer.appendChild(clone);
   });
-
-  renderInventoryList();
-  renderSummaryPanel();
 }
 
 function renderSummaryPanel() {
@@ -787,31 +826,34 @@ function renderSummaryPanel() {
   const { maxWeightPerOperatorKg, teamSize, durationHours, environment } = state.constraints;
   const readiness = calculateMissionReadiness();
 
-  const kitsSummary = Object.values(state.kits).map((kit) => {
+  const kitsSummary = state.kits.map((kit) => {
     const status = kitStatus(kit);
-    const label = status.overWeight ? '⚠ Over limit' : 'Within limit';
-    const powerLabel = status.powerShortfall ? 'Power shortfall' : 'Power ok';
-    return `<li><strong>${kit.name || 'Kit'}</strong> – ${kit.role || 'Role'} – ${status.totals.totalWeightKg} kg – ${label} – ${powerLabel}</li>`;
+    const weightStatus = status.overWeight ? 'Over limit' : 'Within weight limit';
+    const powerLabel = status.powerShortfall ? 'Power shortfall likely' : 'Power OK';
+    const runtimePct = Math.min(100, Math.round(status.runtime.coverage * 100));
+    return `<li>${kit.name || 'Kit'} (${kit.role || 'Role'}) – ${status.totals.totalWeightKg} kg / ${maxWeightPerOperatorKg} kg – ${weightStatus} – Power: ~${runtimePct}% of ${durationHours}h requirement</li>`;
   }).join('');
 
   const batteries = Object.entries(batteryCounts).map(([name, qty]) => `<li>${name}: ${qty}</li>`).join('') || '<li>None</li>';
 
-  summaryContent.innerHTML = `
+  const weightStatusClass = readiness.percentWithin === 100 ? 'status-green' : readiness.percentWithin < 50 ? 'status-red' : 'status-amber';
+
+  elements.summaryContent.innerHTML = `
     <div class="summary-grid">
       <div class="summary-tile">
         <p class="muted">Total kits</p>
-        <div class="tile-value">${Object.keys(state.kits).length}</div>
+        <div class="tile-value">${state.kits.length}</div>
       </div>
       <div class="summary-tile">
-        <p class="muted">Operators</p>
+        <p class="muted">Total operators</p>
         <div class="tile-value">${teamSize}</div>
       </div>
       <div class="summary-tile">
-        <p class="muted">Team weight</p>
+        <p class="muted">Total team weight</p>
         <div class="tile-value">${teamWeight} kg</div>
       </div>
       <div class="summary-tile">
-        <p class="muted">Avg / limit</p>
+        <p class="muted">Avg weight vs limit</p>
         <div class="tile-value">${avgWeight} kg vs ${maxWeightPerOperatorKg || '--'} kg</div>
       </div>
       <div class="summary-tile">
@@ -826,8 +868,8 @@ function renderSummaryPanel() {
     <div class="summary-card">
       <h3>Mission Readiness</h3>
       <p class="muted">${environment} | ${durationHours}h | Team size ${teamSize}</p>
-      <div class="badge ${readiness.percentWithin === 100 ? 'badge-success' : readiness.percentWithin <= 40 ? 'badge-danger' : 'badge-warning'}">${readiness.status}</div>
-      <p>${readiness.within || 0}/${readiness.total || Object.keys(state.kits).length} kits within weight limits.</p>
+      <div class="badge ${weightStatusClass}">${readiness.status}</div>
+      <p>${readiness.within || 0}/${readiness.total || state.kits.length} kits within weight limits.</p>
     </div>
     <div class="summary-card">
       <h3>Per-kit status</h3>
@@ -843,43 +885,75 @@ function renderSummaryPanel() {
   renderExportPanel();
 }
 
-function renderMissionSnapshot() {
-  const { durationHours, environment, teamSize, maxWeightPerOperatorKg, powerStrategy } = state.constraints;
-  const power = powerStrategy.powerExternal ? 'External' : powerStrategy.powerGenerator ? 'Generator' : 'Battery-only';
-  snapshotEl.textContent = `${durationHours}h | ${environment} | ${teamSize} operators | ${maxWeightPerOperatorKg} kg cap | ${power}`;
-}
-
 function renderExportPanel() {
-  exportContent.innerHTML = `
+  const readiness = calculateMissionReadiness();
+  const payload = buildExportPayload();
+  elements.exportContent.innerHTML = `
     <div class="summary-card">
-      <p class="muted">JSON export includes constraints, kits, and computed totals.</p>
+      <p class="muted">JSON export includes constraints, kits, inventory used, and computed totals.</p>
+      <p class="muted">Current readiness: ${readiness.status}.</p>
+      <p class="muted">${payload.kits.length} kits | ${payload.summary.teamWeight} kg team weight.</p>
     </div>
   `;
 }
 
 function handleInventoryActions(e) {
+  const down = e.target.closest('.qty-down');
+  const up = e.target.closest('.qty-up');
+  if (down) {
+    adjustItemQuantity(down.dataset.kit, down.dataset.item, -1);
+    return;
+  }
+  if (up) {
+    addItemToKit(up.dataset.kit, up.dataset.item);
+    return;
+  }
   const btn = e.target.closest('.add-to-kit');
   if (!btn) return;
   const itemId = btn.dataset.item;
   const select = btn.parentElement.querySelector('.kit-target');
   let kitId = select ? select.value : '';
   if (kitId === '__new__' || !kitId) {
-    kitId = addKit('Quick kit', '');
+    const created = addKit('Quick kit', '');
+    kitId = created;
   }
   addItemToKit(kitId, itemId);
+}
+
+function hydrateBlank() {
+  if (state.kits.length === 0) {
+    addKit('Alpha Kit', 'Lead');
+    addKit('Bravo Kit', 'Support');
+  }
+}
+
+function applyPreset(id) {
+  const preset = state.presets.find((p) => p.id === id);
+  if (!preset) return;
+  state.constraints = structuredClone(preset.constraints);
+  state.kits = preset.kits.map((kit) => ({
+    ...createKitBase(kit.name, kit.role),
+    items: structuredClone(kit.items),
+  }));
+  syncConstraintForm();
+  renderAll();
+  persistState();
+  document.querySelector('#kits').scrollIntoView({ behavior: 'smooth' });
 }
 
 function buildChecklistText() {
   const { constraints } = state;
   const lines = [
     `Mission: ${constraints.durationHours}h, ${constraints.environment}, ${constraints.teamSize} operators`,
-    `Limits: ${constraints.maxWeightPerOperatorKg} kg per operator, Power: ${constraints.powerStrategy.powerBatteryOnly ? 'Battery-only' : constraints.powerStrategy.powerGenerator ? 'Generator' : 'External'}`,
+    `Limits: ${constraints.maxWeightPerOperatorKg} kg per operator`,
+    `Power: ${constraints.powerStrategy.powerBatteryOnly ? 'Battery-only' : constraints.powerStrategy.powerGenerator ? 'Generator-backed' : 'External/shore available'}`,
     '',
   ];
 
-  Object.values(state.kits).forEach((kit) => {
+  state.kits.forEach((kit) => {
     const status = kitStatus(kit);
-    lines.push(`${kit.name || 'Kit'} – ${kit.role || 'Role'} – ${status.totals.totalWeightKg} kg – ${status.overWeight ? 'Over limit' : 'Within limit'}`);
+    const powerLabel = status.powerShortfall ? 'Power shortfall likely' : 'Power OK';
+    lines.push(`${kit.name || 'Kit'} – ${kit.role || 'Role'} – ${status.totals.totalWeightKg} kg – ${status.overWeight ? 'Over limit' : 'Within weight limit'} – ${powerLabel}`);
     Object.entries(kit.items).forEach(([itemId, qty]) => {
       const item = state.inventoryById[itemId];
       if (!item) return;
@@ -891,7 +965,10 @@ function buildChecklistText() {
 
   const readiness = calculateMissionReadiness();
   const teamSummary = calculateTeamSummary();
-  lines.push(`Summary: ${readiness.within || 0}/${readiness.total || Object.keys(state.kits).length} kits within weight limit. Total team weight: ${teamSummary.teamWeight} kg.`);
+  lines.push('Summary:');
+  lines.push(`- Kits within weight limit: ${readiness.within || 0}/${readiness.total || state.kits.length}`);
+  lines.push(`- Total team weight: ${teamSummary.teamWeight} kg`);
+  lines.push(`- Total batteries: ${Object.values(teamSummary.batteryCounts).reduce((a, b) => a + b, 0)} (${teamSummary.totalEnergy} Wh)`);
   lines.push('Notes:');
   lines.push(constraints.notes || '');
   return lines.join('\n');
@@ -899,12 +976,9 @@ function buildChecklistText() {
 
 function copyChecklist() {
   const text = buildChecklistText();
+  const setStatus = (msg) => { elements.clipboardStatus.textContent = msg; };
   if (navigator.clipboard) {
-    navigator.clipboard.writeText(text).then(() => {
-      alert('Checklist copied to clipboard');
-    }).catch(() => {
-      alert('Copy failed');
-    });
+    navigator.clipboard.writeText(text).then(() => setStatus('Checklist copied to clipboard')).catch(() => setStatus('Copy failed'));
   } else {
     const textarea = document.createElement('textarea');
     textarea.value = text;
@@ -912,19 +986,35 @@ function copyChecklist() {
     textarea.select();
     document.execCommand('copy');
     document.body.removeChild(textarea);
-    alert('Checklist copied to clipboard');
+    setStatus('Checklist copied to clipboard');
   }
 }
 
-function downloadJSON() {
-  const payload = {
+function buildExportPayload() {
+  const kitsWithTotals = state.kits.map((kit) => ({
+    ...kit,
+    totals: calculateKitTotals(kit),
+    power: kitPowerProfile(kit),
+  }));
+  const usedInventoryIds = new Set();
+  state.kits.forEach((kit) => {
+    Object.keys(kit.items).forEach((id) => usedInventoryIds.add(id));
+  });
+  const inventoryUsed = Array.from(usedInventoryIds).map((id) => state.inventoryById[id]).filter(Boolean);
+  return {
     constraints: state.constraints,
-    kits: state.kits,
+    kits: kitsWithTotals,
+    inventoryUsed,
     summary: calculateTeamSummary(),
+    readiness: calculateMissionReadiness(),
     exportedAt: new Date().toISOString(),
   };
+}
+
+function downloadJSON() {
+  const payload = buildExportPayload();
   const envSafe = state.constraints.environment.toLowerCase();
-  const fileName = `kitsmith_export_${state.constraints.durationHours}h_${envSafe}.json`;
+  const fileName = `kitsmith_export_${state.constraints.durationHours}h_${envSafe}_${formatTimestamp()}.json`;
   const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
   const url = URL.createObjectURL(blob);
   const link = document.createElement('a');
@@ -934,33 +1024,123 @@ function downloadJSON() {
   URL.revokeObjectURL(url);
 }
 
-function hydrateBlank() {
-  addKit('Alpha Kit', '');
+function buildManifest(xmlName, jsonPath) {
+  const uid = crypto.randomUUID ? crypto.randomUUID() : `uid_${Date.now()}`;
+  return `
+<MissionPackageManifest version="2">
+  <Configuration>
+    <Parameter name="uid" value="${uid}" />
+    <Parameter name="name" value="${xmlName}" />
+    <Parameter name="onReceiveImport" value="true" />
+    <Parameter name="onReceiveDelete" value="false" />
+  </Configuration>
+  <Contents>
+    <Content ignore="false" zipEntry="${jsonPath}">
+      <Parameter name="name" value="KitSmith kit export" />
+      <Parameter name="contentType" value="DATA" />
+    </Content>
+  </Contents>
+</MissionPackageManifest>`;
 }
 
-function applyPreset(id) {
-  const preset = state.presets.find((p) => p.id === id);
-  if (!preset) return;
-  state.constraints = structuredClone(preset.constraints);
-  state.kits = {};
-  preset.kits.forEach((kit) => {
-    const kitId = addKit(kit.name, kit.role);
-    state.kits[kitId].items = structuredClone(kit.items);
+async function exportAtakMissionPackage() {
+  const payload = buildExportPayload();
+  const envSafe = state.constraints.environment.toLowerCase();
+  const timestamp = formatTimestamp();
+  const jsonName = `kitsmith/kit_${timestamp}.json`;
+  const manifestName = 'MANIFEST/manifest.xml';
+  const packageName = `KitSmith_MissionPackage_${state.constraints.durationHours}h_${envSafe}_${timestamp}.zip`;
+  const manifest = buildManifest(`KitSmith_${state.constraints.durationHours}h_${state.constraints.environment}_${timestamp}`, jsonName);
+
+  const zip = new JSZip();
+  zip.file(jsonName, JSON.stringify(payload, null, 2));
+  zip.file(manifestName, manifest);
+  const blob = await zip.generateAsync({ type: 'blob' });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = packageName;
+  link.click();
+  URL.revokeObjectURL(url);
+}
+
+function toggleKitForm(show) {
+  elements.kitForm.hidden = !show;
+  if (show) {
+    elements.kitNameInput.focus();
+  } else {
+    elements.kitNameInput.value = '';
+    elements.kitRoleInput.value = '';
+  }
+}
+
+function handleKitFormSave() {
+  const name = elements.kitNameInput.value.trim() || 'New Kit';
+  const role = elements.kitRoleInput.value.trim();
+  addKit(name, role);
+  toggleKitForm(false);
+}
+
+function renderCategoryButtons() {
+  const categories = ['all', 'Battery', 'Radio', 'Node', 'UxS', 'Tool', 'Sustainment', 'Other'];
+  elements.categoryButtons.innerHTML = categories.map((cat) => `<button class="filter-button ${cat === 'all' ? 'active' : ''}" data-category="${cat}">${cat}</button>`).join('');
+}
+
+function handleCategoryClick(e) {
+  const btn = e.target.closest('.filter-button');
+  if (!btn) return;
+  document.querySelectorAll('.filter-button').forEach((el) => el.classList.remove('active'));
+  btn.classList.add('active');
+  renderInventoryList();
+}
+
+function handleNavScroll() {
+  const sections = ['constraints', 'inventory', 'kits', 'summary', 'export'].map((id) => document.getElementById(id));
+  const scrollPos = document.documentElement.scrollTop || document.body.scrollTop;
+  const offset = 120;
+  let activeId = 'constraints';
+  sections.forEach((section) => {
+    if (section && section.offsetTop - offset <= scrollPos) {
+      activeId = section.id;
+    }
   });
+  document.querySelectorAll('.nav-link').forEach((link) => {
+    const target = link.dataset.scroll.replace('#', '');
+    link.classList.toggle('active', target === activeId);
+  });
+}
+
+function renderAll() {
+  renderInventoryList();
+  renderKitsPanel();
+  renderSummaryPanel();
+  handleNavScroll();
+}
+
+async function init() {
+  renderCategoryButtons();
+  attachEvents();
+  await loadPresets();
+  await loadInventory();
+  hydrateBlank();
+  syncConstraintForm();
   renderAll();
-  persistState();
-  document.querySelector('#kits').scrollIntoView({ behavior: 'smooth' });
+  checkRestore();
 }
 
 function attachEvents() {
-  document.getElementById('constraints-form').addEventListener('input', updateConstraintsFromForm);
+  elements.constraintsForm.addEventListener('input', updateConstraintsFromForm);
   document.getElementById('reset-constraints').addEventListener('click', resetConstraintsForm);
-  document.getElementById('filter-category').addEventListener('change', renderInventoryList);
   document.getElementById('filter-text').addEventListener('input', renderInventoryList);
-  inventoryListEl.addEventListener('click', handleInventoryActions);
-  document.getElementById('add-kit').addEventListener('click', () => addKit('New Kit', ''));
+  elements.categoryButtons.addEventListener('click', handleCategoryClick);
+  elements.inventoryListEl.addEventListener('click', handleInventoryActions);
+  document.getElementById('kits-container').addEventListener('click', handleInventoryActions);
+  document.getElementById('add-kit').addEventListener('click', () => toggleKitForm(true));
+  document.getElementById('save-kit').addEventListener('click', handleKitFormSave);
+  document.getElementById('cancel-kit').addEventListener('click', () => toggleKitForm(false));
   document.getElementById('copy-checklist').addEventListener('click', copyChecklist);
   document.getElementById('download-json').addEventListener('click', downloadJSON);
+  document.getElementById('download-atak').addEventListener('click', exportAtakMissionPackage);
   document.getElementById('demo-recon').addEventListener('click', () => applyPreset('recon24'));
   document.getElementById('demo-uxs').addEventListener('click', () => applyPreset('uxs48'));
   document.querySelectorAll('.nav-link').forEach((btn) => {
@@ -969,21 +1149,7 @@ function attachEvents() {
       if (target) target.scrollIntoView({ behavior: 'smooth' });
     });
   });
-}
-
-function renderAll() {
-  renderKitsPanel();
-  renderInventoryList();
-  renderSummaryPanel();
-}
-
-async function init() {
-  attachEvents();
-  await loadPresets();
-  await loadInventory();
-  hydrateBlank();
-  renderAll();
-  checkRestore();
+  document.addEventListener('scroll', handleNavScroll, { passive: true });
 }
 
 document.addEventListener('DOMContentLoaded', init);

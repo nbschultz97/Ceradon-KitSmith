@@ -77,6 +77,28 @@
     #app-root {
       display: none;
     }
+
+    .status-banner {
+      margin: 1rem auto 0.5rem;
+      max-width: 1180px;
+      padding: 0.75rem 1rem;
+      border-radius: 10px;
+      border: 1px solid #d0d7de;
+      background: #f6f8fa;
+      color: #1f2933;
+    }
+
+    .status-banner[data-tone="warning"] {
+      border-color: #fcd34d;
+      background: #fffbeb;
+      color: #92400e;
+    }
+
+    .status-banner[data-tone="error"] {
+      border-color: #fca5a5;
+      background: #fef2f2;
+      color: #991b1b;
+    }
   </style>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js" integrity="sha512-Fs5INomIQhR6CP3+xwlv6xLUOKUzYZdqzwc+ZZq0VEEv1pn6gGGY10m1HzFqp2saojlYCHGmDJtrvlaK0qIItw==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
 </head>
@@ -130,6 +152,8 @@
       </nav>
     </header>
 
+    <div id="status-banner" class="status-banner" hidden aria-live="polite"></div>
+
     <main class="layout">
       <section id="constraints" class="panel">
         <div class="panel-header">
@@ -140,6 +164,7 @@
           <div class="preset-actions">
             <button id="demo-recon" class="btn-ghost" type="button">Load 24h Recon Patrol</button>
             <button id="demo-uxs" class="btn-ghost" type="button">Load 48h UxS-Heavy Mission</button>
+            <button id="demo-whitefrost" class="btn-primary" type="button">Load WHITEFROST Demo</button>
             <button id="reset-constraints" class="btn-ghost" type="button">Reset to Blank</button>
           </div>
         </div>
@@ -166,6 +191,14 @@
                   <option value="Maritime">Maritime</option>
                   <option value="Desert">Desert</option>
                 </select>
+              </label>
+              <label>
+                Altitude (m)
+                <input type="number" step="10" name="altitudeM" placeholder="e.g., 2200" />
+              </label>
+              <label>
+                Temperature (°C)
+                <input type="number" step="1" name="temperatureC" placeholder="e.g., -15" />
               </label>
             </div>
           </div>
@@ -220,6 +253,10 @@
               <label class="full-width">
                 Load Mission metadata JSON
                 <input type="file" id="mission-import" accept="application/json" />
+              </label>
+              <label class="full-width">
+                Load MissionProject JSON
+                <input type="file" id="mission-project-import" accept="application/json" />
               </label>
               <p class="muted full-width">Imports are optional. Provide Node/Platform designs to seed kits and items; provide mission metadata to pre-fill duration, environment, team, and safety factor.</p>
             </div>
@@ -303,6 +340,7 @@
           <div class="summary-actions">
             <button id="copy-checklist" class="btn-ghost" type="button">Copy Text Checklist</button>
             <button id="download-json" class="btn-ghost" type="button">Download JSON</button>
+            <button id="download-mission-project" class="btn-ghost" type="button">Export MissionProject JSON</button>
             <button id="download-atak" class="btn-primary" type="button">Download ATAK Mission Package (.zip)</button>
           </div>
         </div>
@@ -360,15 +398,18 @@
       const input = document.getElementById("demo-code");
       const enterButton = document.getElementById("demo-enter");
       const error = document.getElementById("demo-error");
+      const demoRequest = document.getElementById("demo-request");
 
       function showGate() {
         gate.style.display = "block";
         appRoot.style.display = "none";
+        if (demoRequest) demoRequest.style.display = "block";
       }
 
       function showApp() {
         gate.style.display = "none";
         appRoot.style.display = "block";
+        if (demoRequest) demoRequest.style.display = "none";
       }
 
       function validateCode() {

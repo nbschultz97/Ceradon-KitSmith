@@ -1,18 +1,54 @@
-const MISSION_PROJECT_SCHEMA_VERSION = 1;
+const MISSION_PROJECT_SCHEMA_VERSION = 2;
 const MISSION_PROJECT_STORAGE_KEY = 'mission_project';
 
 function createEmptyMissionProject() {
   return {
     schemaVersion: MISSION_PROJECT_SCHEMA_VERSION,
-    mission: {},
+    origin_tool: 'kit',
+    id: `mission_${Date.now()}`,
+    name: 'Untitled Mission',
+    mission: {
+      summary: '',
+      commander_intent: '',
+      ao: '',
+      time_window: '',
+    },
+    environment: {
+      temperature_c: null,
+      altitude_m: null,
+      terrain: '',
+      weather: '',
+      notes: '',
+    },
+    constraints: {
+      duration_hours: null,
+      team_size: null,
+      max_weight_per_operator_kg: null,
+      safety_factor: 1,
+      power_strategy: {
+        power_external: false,
+        power_generator: false,
+        power_battery_only: true,
+      },
+    },
     nodes: [],
     platforms: [],
+    mesh_links: [],
     kits: {
+      origin_tool: 'kit',
       definitions: [],
       assignments: [],
     },
-    sustainment: {},
   };
+}
+
+function normalizeArray(arr) {
+  return Array.isArray(arr) ? arr : [];
+}
+
+function ensureStableId(prefix, value) {
+  if (value) return value;
+  return `${prefix}_${crypto.randomUUID ? crypto.randomUUID() : Date.now()}`;
 }
 
 function normalizeProject(raw) {
@@ -22,11 +58,47 @@ function normalizeProject(raw) {
   return {
     ...base,
     ...raw,
-    kits: {
-      definitions: Array.isArray(kits) ? kits : kits.definitions || [],
-      assignments: kits.assignments || [],
+    origin_tool: raw.origin_tool || 'kit',
+    id: raw.id || base.id,
+    name: raw.name || base.name,
+    mission: { ...base.mission, ...(raw.mission || {}) },
+    environment: { ...base.environment, ...(raw.environment || {}) },
+    constraints: {
+      ...base.constraints,
+      ...(raw.constraints || {}),
+      power_strategy: {
+        ...base.constraints.power_strategy,
+        ...(raw.constraints?.power_strategy || {}),
+      },
     },
-    sustainment: raw.sustainment || {},
+    nodes: normalizeArray(raw.nodes).map((node, idx) => ({
+      id: ensureStableId('node', node.id || node.uid),
+      origin_tool: node.origin_tool || raw.origin_tool || 'kit',
+      ...node,
+    })),
+    platforms: normalizeArray(raw.platforms).map((platform, idx) => ({
+      id: ensureStableId('platform', platform.id || platform.uid),
+      origin_tool: platform.origin_tool || raw.origin_tool || 'kit',
+      ...platform,
+    })),
+    mesh_links: normalizeArray(raw.mesh_links).map((link, idx) => ({
+      id: ensureStableId('link', link.id),
+      origin_tool: link.origin_tool || raw.origin_tool || 'kit',
+      ...link,
+    })),
+    kits: {
+      origin_tool: kits.origin_tool || raw.origin_tool || 'kit',
+      definitions: normalizeArray(kits.definitions || kits.kits || kits).map((kit, idx) => ({
+        id: ensureStableId('kit', kit.id),
+        origin_tool: kit.origin_tool || raw.origin_tool || 'kit',
+        ...kit,
+      })),
+      assignments: normalizeArray(kits.assignments).map((asg, idx) => ({
+        id: ensureStableId('asg', asg.id),
+        origin_tool: asg.origin_tool || raw.origin_tool || 'kit',
+        ...asg,
+      })),
+    },
     schemaVersion: MISSION_PROJECT_SCHEMA_VERSION,
   };
 }

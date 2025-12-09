@@ -563,6 +563,21 @@ legend {
   gap: 10px;
 }
 
+.status-list {
+  list-style: none;
+  padding-left: 0;
+  margin: 0;
+  display: grid;
+  gap: 6px;
+}
+
+.status-list li {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
 .summary-tile {
   padding: 12px;
   border: 1px solid var(--border);

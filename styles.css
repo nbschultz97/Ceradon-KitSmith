@@ -74,6 +74,13 @@ a:hover {
   flex-wrap: wrap;
 }
 
+.top-actions {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
 .nav-link {
   background: transparent;
   border: 1px solid var(--border);
@@ -99,6 +106,16 @@ a:hover {
   grid-template-rows: auto;
   gap: 16px;
   padding: 16px;
+}
+
+@media (max-width: 1320px) {
+  .layout {
+    grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+  }
+  .top-bar {
+    flex-wrap: wrap;
+    gap: 10px;
+  }
 }
 
 .panel {
@@ -330,6 +347,34 @@ legend {
   color: var(--muted);
 }
 
+.pill.strong {
+  color: var(--text);
+  border-color: var(--accent);
+}
+
+.status-chip {
+  display: inline-block;
+  padding: 4px 8px;
+  border-radius: 8px;
+  font-size: 0.85rem;
+  border: 1px solid var(--border);
+}
+
+.status-chip.green {
+  border-color: var(--success);
+  color: var(--success);
+}
+
+.status-chip.amber {
+  border-color: var(--warning);
+  color: var(--warning);
+}
+
+.status-chip.red {
+  border-color: var(--danger);
+  color: var(--danger);
+}
+
 .badge-success {
   border-color: var(--success);
   color: var(--success);
@@ -536,6 +581,13 @@ legend {
   border: 1px dashed var(--border);
   border-radius: 12px;
   color: var(--muted);
+}
+
+.constraint-bar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 10px;
 }
 
 .restore-banner {

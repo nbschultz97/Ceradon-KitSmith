@@ -9,7 +9,7 @@ KitSmith is a lightweight, browser-based kit and sustainment planner built to al
 - Build multiple kits (per operator or vehicle), adjust quantities, and see live totals (weight, energy, runtime heuristic).
 - Check per-operator weight and highlight overloads with a per-operator rollup.
 - Visualize sustainment timelines across 24/48/72h (or mission-defined) windows with battery risk flags.
-- Import Node/Platform design JSON and optional Mission metadata to pre-seed kits and constraints.
+- Import Node/Platform design JSON and optional Mission metadata to pre-seed kits and constraints, or ingest full MissionProject files with auto-proposed kits by element when none exist.
 - Export the current session as JSON or copy a text-based packing checklist.
 - Generate printable per-kit checklists with line-item checkboxes.
 - Dark, panel-based UI styled after Ceradon UxS Architect for quick adoption in the stack.
@@ -50,6 +50,7 @@ KitSmith reads and writes a shared **MissionProject** JSON envelope (schema v2, 
 
 ## Export formats
 - **JSON:** Download `kitsmith_export.json` containing constraints (including safety factor), kits with totals, operator loads, sustainment flags, and a timestamp. A nested `missionProject` block mirrors the same data for downstream tools.
+- **MissionProject JSON:** First-class import/export buttons round-trip the sustainment view while also emitting `kits[]`, `kits_flat[]`, and `constraints.list` for Architect stack tools.
 - **Text checklist:** Builds a plain-text block with mission context and per-kit line items (copy to clipboard).
 - **Printable checklists:** Generates per-kit packing lists with multiple checkboxes per line item; use your browser’s print dialog to produce paper copies.
 - **ATAK/tactical package:** The ATAK zip includes the full export JSON, a MissionProject JSON, GeoJSON, and a CoT-style JSON stub. See `docs/atak_exports.md` for fields and ingest notes.

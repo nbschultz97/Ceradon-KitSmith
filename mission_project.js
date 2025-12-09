@@ -1,5 +1,13 @@
 const MISSION_PROJECT_SCHEMA_VERSION = 2;
 const MISSION_PROJECT_STORAGE_KEY = 'mission_project';
+const DEFAULT_CONSTRAINT_KEYS = [
+  'duration_hours',
+  'team_size',
+  'max_weight_per_operator_kg',
+  'safety_factor',
+  'environment',
+  'power_strategy',
+];
 
 function createEmptyMissionProject() {
   return {
@@ -55,6 +63,14 @@ function normalizeProject(raw) {
   const base = createEmptyMissionProject();
   if (!raw || typeof raw !== 'object') return base;
   const kits = raw.kits || {};
+  const constraintsList = Array.isArray(raw.constraints?.list || raw.constraints_list)
+    ? raw.constraints.list || raw.constraints_list
+    : [];
+  const constraintObjFromList = constraintsList.reduce((acc, entry) => {
+    if (!entry || !entry.key) return acc;
+    acc[entry.key] = entry.value;
+    return acc;
+  }, {});
   return {
     ...base,
     ...raw,
@@ -66,10 +82,12 @@ function normalizeProject(raw) {
     constraints: {
       ...base.constraints,
       ...(raw.constraints || {}),
+      ...constraintObjFromList,
       power_strategy: {
         ...base.constraints.power_strategy,
         ...(raw.constraints?.power_strategy || {}),
       },
+      list: constraintsList,
     },
     nodes: normalizeArray(raw.nodes).map((node, idx) => ({
       id: ensureStableId('node', node.id || node.uid),

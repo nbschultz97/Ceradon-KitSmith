@@ -164,6 +164,62 @@ const fallbackPresets = [
     ],
   },
   {
+    id: 'sustainment48',
+    label: 'Load demo sustainment scenario',
+    constraints: {
+      durationHours: 48,
+      environment: 'Rural',
+      teamSize: 5,
+      maxWeightPerOperatorKg: 23,
+      safetyFactor: 1.25,
+      powerStrategy: {
+        powerExternal: false,
+        powerGenerator: true,
+        powerBatteryOnly: true,
+      },
+      notes: 'Neutral sustainment demo: 48h mixed ISR, relay, and team sustainment package.',
+    },
+    kits: [
+      {
+        name: 'ISR kit',
+        role: 'ISR overwatch',
+        items: {
+          uxs_quadcopter_scout: 1,
+          bat_4s_5000: 4,
+          bat_98wh_brick: 1,
+          radio_harris_152: 1,
+          tool_multitool: 1,
+          sustain_mre: 2,
+          sustain_water_blader: 1,
+        },
+      },
+      {
+        name: 'Relay support kit',
+        role: 'Mesh relay support',
+        items: {
+          node_vantage_edge: 2,
+          bat_98wh_brick: 3,
+          bat_240wh_station: 1,
+          power_solar_fold: 1,
+          tool_tripod: 1,
+          sustain_mre: 2,
+          sustain_water_blader: 1,
+        },
+      },
+      {
+        name: 'Team sustainment kit',
+        role: 'Base sustainment',
+        items: {
+          sustain_mre: 4,
+          sustain_water_blader: 2,
+          other_batterycharger: 1,
+          radio_vhf: 1,
+          tool_multitool: 1,
+        },
+      },
+    ],
+  },
+  {
     id: 'whitefrost',
     label: 'WHITEFROST Demo',
     constraints: {
@@ -446,6 +502,7 @@ const state = {
   inventoryById: {},
   presets: [],
   statusMessage: '',
+  seededFromMissionProject: false,
 };
 
 function normalizeKitsData(kitsLike) {
@@ -467,8 +524,10 @@ function itemsObjectToArray(items = {}) {
 function itemsArrayToObject(arr = []) {
   if (!Array.isArray(arr)) return arr || {};
   return arr.reduce((acc, entry) => {
-    if (!entry || !entry.id) return acc;
-    acc[entry.id] = (acc[entry.id] || 0) + (Number(entry.qty) || 1);
+    const entryId = entry?.id || entry?.item_id;
+    if (!entryId) return acc;
+    const qty = Number(entry.qty ?? entry.quantity ?? entry.count ?? 1);
+    acc[entryId] = (acc[entryId] || 0) + (qty || 1);
     return acc;
   }, {});
 }
@@ -530,16 +589,47 @@ function setStatusMessage(text, tone = 'info') {
   banner.textContent = text;
 }
 
+function buildConstraintListSnapshot(constraints) {
+  return [
+    { key: 'duration_hours', value: constraints.durationHours },
+    { key: 'team_size', value: constraints.teamSize },
+    { key: 'max_weight_per_operator_kg', value: constraints.maxWeightPerOperatorKg },
+    { key: 'safety_factor', value: constraints.safetyFactor },
+    { key: 'environment', value: constraints.environment },
+    { key: 'power_strategy', value: structuredClone(constraints.powerStrategy) },
+  ];
+}
+
+function buildKitItemDetails(kit) {
+  return Object.entries(kit.items || {}).map(([itemId, qty]) => {
+    const item = state.inventoryById[itemId] || {};
+    const weight_kg = typeof item.weight_g === 'number' ? +(item.weight_g * qty / 1000).toFixed(3) : null;
+    const energy_wh = typeof item.energy_wh === 'number' ? +(item.energy_wh * qty).toFixed(1) : null;
+    return {
+      item_id: itemId,
+      description: item.name || itemId,
+      qty: qty || 0,
+      weight_kg,
+      energy_wh,
+    };
+  });
+}
+
+function mapAssignmentsByKit() {
+  const map = {};
+  state.assignments.forEach((assign) => {
+    (assign.kitIds || []).forEach((id) => {
+      if (assign.operator) map[id] = assign.operator;
+      else if (assign.role) map[id] = assign.role;
+    });
+  });
+  return map;
+}
+
 function buildMissionProjectFromState() {
   const base = state.project || createEmptyMissionProject();
-  const constraintsList = [
-    { key: 'duration_hours', value: state.constraints.durationHours },
-    { key: 'team_size', value: state.constraints.teamSize },
-    { key: 'max_weight_per_operator_kg', value: state.constraints.maxWeightPerOperatorKg },
-    { key: 'safety_factor', value: state.constraints.safetyFactor },
-    { key: 'environment', value: state.constraints.environment },
-    { key: 'power_strategy', value: structuredClone(state.constraints.powerStrategy) },
-  ];
+  const constraintsList = buildConstraintListSnapshot(state.constraints);
+  const assignmentMap = mapAssignmentsByKit();
   const project = {
     ...base,
     origin_tool: 'kit',
@@ -575,8 +665,9 @@ function buildMissionProjectFromState() {
           ...kit,
           origin_tool: 'kit',
           intended_role: kit.role || '',
-          assigned_to_element: (state.assignments.find((a) => (a.kitIds || []).includes(kit.id)) || {}).operator || '',
-          items: itemsObjectToArray(kit.items),
+          role: kit.role || '',
+          assigned_element: assignmentMap[kit.id] || kit.role || '',
+          items: buildKitItemDetails(kit),
           total_weight_kg: totals.totalWeightKg,
           total_energy_wh: totals.totalEnergyWh,
         };
@@ -610,26 +701,13 @@ function loadLegacyState() {
 }
 
 function hydrateFromMissionProject() {
+  const raw = localStorage.getItem(MISSION_PROJECT_STORAGE_KEY);
+  if (!raw) {
+    state.project = createEmptyMissionProject();
+    return;
+  }
   const project = loadMissionProject();
-  state.project = project;
-  const constraints = project.constraints || {};
-  const env = project.environment || {};
-  state.constraints = {
-    ...structuredClone(defaultConstraints),
-    durationHours: constraints.duration_hours ?? constraints.durationHours ?? defaultConstraints.durationHours,
-    environment: env.terrain || constraints.environment || defaultConstraints.environment,
-    teamSize: constraints.team_size ?? constraints.teamSize ?? defaultConstraints.teamSize,
-    maxWeightPerOperatorKg: constraints.max_weight_per_operator_kg ?? constraints.maxWeightPerOperatorKg ?? defaultConstraints.maxWeightPerOperatorKg,
-    safetyFactor: constraints.safety_factor ?? constraints.safetyFactor ?? defaultConstraints.safetyFactor,
-    powerStrategy: { ...structuredClone(defaultConstraints.powerStrategy), ...(constraints.power_strategy || constraints.powerStrategy || {}) },
-    notes: env.notes || project.mission?.summary || '',
-    altitudeM: env.altitude_m ?? null,
-    temperatureC: env.temperature_c ?? null,
-  };
-
-  const kitsSection = project.kits || {};
-  state.kits = normalizeKitsData(kitsSection.definitions || kitsSection.kits || kitsSection);
-  state.assignments = normalizeAssignments(kitsSection.assignments);
+  ingestMissionProject(project, { skipRender: true, quiet: true });
 
   if (!state.kits.length) {
     const legacy = loadLegacyState();
@@ -638,15 +716,6 @@ function hydrateFromMissionProject() {
       state.kits = normalizeKitsData(legacy.kits);
       localStorage.removeItem(STORAGE_KEY);
     }
-  }
-
-  if (!state.assignments.length && state.kits.length) {
-    state.assignments = state.kits.map((kit, idx) => ({
-      id: `asg_${kit.id}`,
-      operator: kit.name || `Operator ${idx + 1}`,
-      role: kit.role || '',
-      kitIds: [kit.id],
-    }));
   }
 }
 
@@ -677,60 +746,124 @@ async function loadPresets() {
   }
 }
 
-function applyMissionMeta(meta = {}) {
-  if (Array.isArray(meta.list)) {
-    meta.list.forEach((entry) => {
+function applyConstraintsFromProject(constraints = {}, env = {}) {
+  if (Array.isArray(constraints.list)) {
+    constraints.list.forEach((entry) => {
       if (!entry || !entry.key) return;
-      meta[entry.key] = entry.value;
+      constraints[entry.key] = entry.value;
     });
   }
-  if (meta.durationHours || meta.duration_hours) state.constraints.durationHours = Number(meta.durationHours ?? meta.duration_hours);
-  if (meta.environment || meta.terrain) state.constraints.environment = meta.environment || meta.terrain;
-  if (meta.teamSize || meta.team_size) state.constraints.teamSize = Number(meta.teamSize ?? meta.team_size);
-  if (meta.maxWeightPerOperatorKg || meta.max_weight_per_operator_kg) state.constraints.maxWeightPerOperatorKg = Number(meta.maxWeightPerOperatorKg ?? meta.max_weight_per_operator_kg);
-  if (meta.safetyFactor || meta.safety_factor) state.constraints.safetyFactor = Number(meta.safetyFactor ?? meta.safety_factor);
-  if (meta.altitudeM || meta.altitude_m) state.constraints.altitudeM = Number(meta.altitudeM ?? meta.altitude_m);
-  if (meta.temperatureC || meta.temperature_c) state.constraints.temperatureC = Number(meta.temperatureC ?? meta.temperature_c);
+  const power = constraints.power_strategy || constraints.powerStrategy || {};
+  state.constraints = {
+    ...structuredClone(defaultConstraints),
+    ...state.constraints,
+    durationHours: Number(constraints.durationHours ?? constraints.duration_hours ?? state.constraints.durationHours ?? defaultConstraints.durationHours),
+    environment: env.terrain || constraints.environment || state.constraints.environment || defaultConstraints.environment,
+    teamSize: Number(constraints.team_size ?? constraints.teamSize ?? state.constraints.teamSize ?? defaultConstraints.teamSize),
+    maxWeightPerOperatorKg: Number(constraints.max_weight_per_operator_kg ?? constraints.maxWeightPerOperatorKg ?? state.constraints.maxWeightPerOperatorKg ?? defaultConstraints.maxWeightPerOperatorKg),
+    safetyFactor: Number(constraints.safety_factor ?? constraints.safetyFactor ?? state.constraints.safetyFactor ?? defaultConstraints.safetyFactor),
+    powerStrategy: { ...structuredClone(defaultConstraints.powerStrategy), ...power },
+    notes: env.notes || constraints.notes || state.constraints.notes || '',
+    altitudeM: env.altitude_m ?? state.constraints.altitudeM ?? null,
+    temperatureC: env.temperature_c ?? state.constraints.temperatureC ?? null,
+  };
   syncConstraintForm();
+}
+
+function applyMissionMeta(meta = {}) {
+  const missionPatch = { ...(meta || {}) };
+  if (Array.isArray(missionPatch.list)) {
+    missionPatch.list.forEach((entry) => {
+      if (!entry || !entry.key) return;
+      missionPatch[entry.key] = entry.value;
+    });
+  }
+  const project = state.project || createEmptyMissionProject();
+  state.seededFromMissionProject = true;
+  project.constraints = {
+    ...project.constraints,
+    duration_hours: Number(missionPatch.durationHours ?? missionPatch.duration_hours ?? project.constraints?.duration_hours ?? defaultConstraints.durationHours),
+    team_size: Number(missionPatch.teamSize ?? missionPatch.team_size ?? project.constraints?.team_size ?? defaultConstraints.teamSize),
+    max_weight_per_operator_kg: Number(
+      missionPatch.maxWeightPerOperatorKg ?? missionPatch.max_weight_per_operator_kg ?? project.constraints?.max_weight_per_operator_kg ?? defaultConstraints.maxWeightPerOperatorKg
+    ),
+    safety_factor: Number(missionPatch.safetyFactor ?? missionPatch.safety_factor ?? project.constraints?.safety_factor ?? defaultConstraints.safetyFactor),
+    power_strategy: {
+      ...structuredClone(defaultConstraints.powerStrategy),
+      ...(project.constraints?.power_strategy || project.constraints?.powerStrategy || {}),
+      ...(missionPatch.power_strategy || missionPatch.powerStrategy || {}),
+    },
+  };
+  project.constraints.list = buildConstraintListSnapshot({
+    durationHours: project.constraints.duration_hours,
+    teamSize: project.constraints.team_size,
+    maxWeightPerOperatorKg: project.constraints.max_weight_per_operator_kg,
+    safetyFactor: project.constraints.safety_factor,
+    environment: missionPatch.environment || missionPatch.terrain || project.environment?.terrain || project.constraints?.environment,
+    powerStrategy: project.constraints.power_strategy,
+  });
+
+  project.environment = {
+    ...(project.environment || {}),
+    terrain: missionPatch.environment || missionPatch.terrain || project.environment?.terrain || state.constraints.environment,
+    altitude_m: missionPatch.altitudeM ?? missionPatch.altitude_m ?? project.environment?.altitude_m ?? null,
+    temperature_c: missionPatch.temperatureC ?? missionPatch.temperature_c ?? project.environment?.temperature_c ?? null,
+    notes: missionPatch.notes ?? project.environment?.notes ?? state.constraints.notes,
+  };
+  state.project = saveMissionProject(project);
+  applyConstraintsFromProject(project.constraints, project.environment);
   renderAll();
   persistState();
 }
 
 function normalizeDesignItems(items = []) {
   return items.reduce((acc, entry) => {
-    if (entry && entry.id) {
-      acc[entry.id] = (acc[entry.id] || 0) + (Number(entry.qty) || 1);
+    const entryId = entry?.id || entry?.item_id;
+    if (entryId) {
+      acc[entryId] = (acc[entryId] || 0) + (Number(entry.qty ?? entry.quantity ?? entry.count) || 1);
     }
     return acc;
   }, {});
 }
 
-function importDesigns(payload) {
-  const kits = [];
-  const { nodes = [], platforms = [], kits: kitList = [] } = payload || {};
-
-  const project = state.project || createEmptyMissionProject();
-  project.nodes = (nodes || []).map((node, idx) => ({
-    id: node.id || `node_${idx + 1}`,
-    origin_tool: node.origin_tool || 'node',
-    ...node,
-  }));
-  project.platforms = (platforms || []).map((platform, idx) => ({
-    id: platform.id || `platform_${idx + 1}`,
-    origin_tool: platform.origin_tool || 'uxs',
-    ...platform,
-  }));
-  state.project = saveMissionProject(project);
-
-  [...nodes, ...platforms, ...kitList].forEach((def, idx) => {
-    if (!def) return;
-    const kit = createKitBase(def.name || `Kit ${idx + 1}`, def.role || def.type || '');
-    kit.items = normalizeDesignItems(def.items || []);
-    kits.push(kit);
+function mergeEntities(existing = [], incoming = [], prefix = 'ent') {
+  const map = new Map();
+  (existing || []).forEach((entity, idx) => {
+    if (!entity) return;
+    const id = entity.id || entity.uid || `${prefix}_${idx + 1}`;
+    map.set(id, { ...entity, id });
   });
+  (incoming || []).forEach((entity, idx) => {
+    if (!entity) return;
+    const id = entity.id || entity.uid || `${prefix}_${map.size + 1}`;
+    map.set(id, { ...entity, id, origin_tool: entity.origin_tool || prefix });
+  });
+  return Array.from(map.values());
+}
 
-  if (kits.length) {
-    state.kits = kits;
+function importDesigns(payload) {
+  const { nodes = [], platforms = [], kits: kitList = [] } = payload || {};
+  const project = state.project || createEmptyMissionProject();
+  project.nodes = mergeEntities(project.nodes, nodes, 'node');
+  project.platforms = mergeEntities(project.platforms, platforms, 'platform');
+  const mergedKits = mergeEntities(project.kits?.definitions || [], kitList, 'kit');
+  project.kits = {
+    ...(project.kits || {}),
+    origin_tool: 'kit',
+    definitions: mergedKits.map((kit) => ({
+      ...kit,
+      items: Array.isArray(kit.items) ? kit.items : itemsObjectToArray(kit.items),
+    })),
+    assignments: project.kits?.assignments || [],
+  };
+  state.project = saveMissionProject(project);
+  state.seededFromMissionProject = true;
+
+  if (mergedKits.length) {
+    state.kits = normalizeKitsData(mergedKits).map((kit) => ({
+      ...kit,
+      items: itemsArrayToObject(Array.isArray(kit.items) ? kit.items : itemsObjectToArray(kit.items)),
+    }));
     renderAll();
     persistState();
   }
@@ -802,25 +935,36 @@ function proposeKitsFromProject(project) {
   return kits;
 }
 
-function importMissionProject(payload) {
+function ingestMissionProject(payload, options = {}) {
+  const opts = { preferEmptyKits: false, quiet: false, skipRender: false, ...options };
   const project = saveMissionProject(payload || {});
   state.project = project;
+  state.seededFromMissionProject = true;
+  applyConstraintsFromProject(project.constraints || {}, project.environment || {});
+
   const kitsSection = project.kits || {};
-  state.kits = normalizeKitsData(kitsSection.definitions || kitsSection.kits || []).map((kit) => ({
+  const kitDefinitions = normalizeKitsData(kitsSection.definitions || kitsSection.kits || project.kits_flat || []).map((kit) => ({
     ...kit,
-    items: itemsArrayToObject(kit.items),
+    items: itemsArrayToObject(Array.isArray(kit.items) ? kit.items : itemsObjectToArray(kit.items)),
   }));
-  state.assignments = normalizeAssignments(kitsSection.assignments);
-  if (!state.kits.length) {
-    state.kits = proposeKitsFromProject(project);
+  if (kitDefinitions.length) {
+    state.kits = kitDefinitions;
+  } else {
+    state.kits = opts.preferEmptyKits ? [] : proposeKitsFromProject(project);
   }
-  applyMissionMeta(project.constraints || {});
+  state.assignments = normalizeAssignments(kitsSection.assignments);
   if (!state.assignments.length && state.kits.length) {
     state.assignments = state.kits.map((kit, idx) => ({ id: `asg_${kit.id}`, operator: kit.name || `Operator ${idx + 1}`, role: kit.role || '', kitIds: [kit.id] }));
   }
-  renderAll();
-  persistState();
-  setStatusMessage('MissionProject loaded', 'info');
+  if (!opts.skipRender) {
+    renderAll();
+    persistState();
+    if (!opts.quiet) setStatusMessage('MissionProject loaded', 'info');
+  }
+}
+
+function importMissionProject(payload) {
+  ingestMissionProject(payload, { preferEmptyKits: true });
 }
 
 async function handleFileImport(inputEl, onLoad) {
@@ -1092,6 +1236,19 @@ function calculateMissionReadiness() {
   return { percentWithin, status, within, total: kits.length };
 }
 
+function calculateTeamEnergyStatus() {
+  const baselineWhPerHour = state.kits.reduce((sum, kit) => sum + kitPowerProfile(kit).baselineWhPerHour, 0);
+  const requiredWh = baselineWhPerHour * (state.constraints.durationHours || 0) * (state.constraints.safetyFactor || 1);
+  const availableWh = state.kits.reduce((sum, kit) => sum + calculateKitTotals(kit).totalEnergyWh, 0);
+  const coverage = requiredWh > 0 ? availableWh / requiredWh : 0;
+  return {
+    baselineWhPerHour,
+    requiredWh: +requiredWh.toFixed(1),
+    availableWh: +availableWh.toFixed(1),
+    coverage,
+  };
+}
+
 function buildOperatorSummary() {
   const { maxWeightPerOperatorKg } = state.constraints;
   const assignments = state.assignments.length
@@ -1342,14 +1499,18 @@ function renderSummaryPanel() {
   const readiness = calculateMissionReadiness();
   const operatorSummary = buildOperatorSummary();
   const timeline = buildSustainmentTimeline();
+  const energyStatus = calculateTeamEnergyStatus();
+  const teamLimit = maxWeightPerOperatorKg && teamSize ? maxWeightPerOperatorKg * teamSize : 0;
+  const teamWeightMargin = teamLimit ? (teamLimit - teamWeight) / teamLimit : 0;
+  const teamWeightTone = marginTone(teamWeightMargin);
+  const energyTone = marginTone(energyStatus.coverage - 1);
+  const powerCoveragePct = Number.isFinite(energyStatus.coverage) ? Math.round(energyStatus.coverage * 100) : 0;
 
   const kitsSummary = state.kits.map((kit) => {
     const status = kitStatus(kit);
-    const weightStatus = status.overWeight ? 'Over limit' : 'Within weight limit';
-    const runtimePct = Math.min(100, Math.round(status.runtime.coverage * 100));
-    const modelNeed = status.runtime.modelBatteryRequirement || 0;
-    const safeNeed = status.runtime.batteryRequirementWithSafety || 0;
-    return `<li>${kit.name || 'Kit'} (${kit.role || 'Role'}) – ${status.totals.totalWeightKg} kg / ${maxWeightPerOperatorKg} kg – ${weightStatus} – Power: ~${runtimePct}% of ${durationHours}h requirement – Batteries: ${modelNeed} model | ${safeNeed} with safety</li>`;
+    const weightTone = marginTone(status.weightMargin);
+    const runtimePct = Number.isFinite(status.runtime.safetyCoverage) ? Math.round(status.runtime.safetyCoverage * 100) : 0;
+    return `<li><strong>${kit.name || 'Kit'} (${kit.role || 'Role'})</strong> · <span class="status-chip ${weightTone}">Weight ${status.totals.totalWeightKg} kg${maxWeightPerOperatorKg ? ` / ${maxWeightPerOperatorKg} kg` : ''}</span> <span class="status-chip ${marginTone(status.runtime.safetyCoverage - 1)}">${runtimePct}% of ${durationHours}h energy</span></li>`;
   }).join('');
 
   const batteries = Object.entries(batteryCounts).map(([name, qty]) => `<li>${name}: ${qty}</li>`).join('') || '<li>None</li>';
@@ -1400,6 +1561,14 @@ function renderSummaryPanel() {
 
   elements.summaryContent.innerHTML = `
     ${constraintBar}
+    <div class="summary-card">
+      <h3>Weight & energy status</h3>
+      <p class="muted">Live against mission constraints.</p>
+      <ul class="status-list">
+        <li>Team load <span class="status-chip ${teamWeightTone}">${teamWeight} kg${teamLimit ? ` / ${teamLimit} kg cap` : ''}</span></li>
+        <li>Power margin <span class="status-chip ${energyTone}">${powerCoveragePct}% of ${durationHours}h need</span> (${energyStatus.availableWh} Wh on hand vs ${energyStatus.requiredWh} Wh required)</li>
+      </ul>
+    </div>
     <div class="summary-grid">
       <div class="summary-tile">
         <p class="muted">Total kits</p>
@@ -1518,7 +1687,7 @@ function handleAssignmentActions(e) {
 }
 
 function hydrateBlank() {
-  if (state.kits.length === 0) {
+  if (state.kits.length === 0 && !state.seededFromMissionProject) {
     addKit('Alpha Kit', 'Lead');
     addKit('Bravo Kit', 'Support');
   }
@@ -1527,6 +1696,7 @@ function hydrateBlank() {
 function applyPreset(id) {
   const preset = state.presets.find((p) => p.id === id);
   if (!preset) return;
+  state.seededFromMissionProject = false;
   state.constraints = structuredClone(preset.constraints);
   state.kits = preset.kits.map((kit) => ({
     ...createKitBase(kit.name, kit.role),
@@ -1541,6 +1711,7 @@ function applyPreset(id) {
 
 function buildChecklistText() {
   const { constraints } = state;
+  const energyStatus = calculateTeamEnergyStatus();
   const lines = [
     `Mission: ${constraints.durationHours}h, ${constraints.environment}, ${constraints.teamSize} operators`,
     `Safety factor: ${constraints.safetyFactor}x`,
@@ -1564,10 +1735,12 @@ function buildChecklistText() {
 
   const readiness = calculateMissionReadiness();
   const teamSummary = calculateTeamSummary();
+  const teamLimit = constraints.maxWeightPerOperatorKg && constraints.teamSize ? constraints.maxWeightPerOperatorKg * constraints.teamSize : null;
   lines.push('Summary:');
   lines.push(`- Kits within weight limit: ${readiness.within || 0}/${readiness.total || state.kits.length}`);
-  lines.push(`- Total team weight: ${teamSummary.teamWeight} kg`);
+  lines.push(`- Total team weight: ${teamSummary.teamWeight} kg${teamLimit ? ` / ${teamLimit} kg cap` : ''}`);
   lines.push(`- Total batteries: ${Object.values(teamSummary.batteryCounts).reduce((a, b) => a + b, 0)} (${teamSummary.totalEnergy} Wh)`);
+  lines.push(`- Power coverage: ${Math.round((energyStatus.coverage || 0) * 100)}% of ${constraints.durationHours}h need (${energyStatus.availableWh} Wh on hand vs ${energyStatus.requiredWh} Wh required)`);
   lines.push('Notes:');
   lines.push(constraints.notes || '');
   return lines.join('\n');
@@ -1803,7 +1976,7 @@ function buildCotStub(project) {
 
 function downloadJSON() {
   const payload = buildExportPayload();
-  const envSafe = state.constraints.environment.toLowerCase();
+  const envSafe = (state.constraints.environment || 'env').toLowerCase();
   const fileName = `kitsmith_export_${state.constraints.durationHours}h_${envSafe}_${formatTimestamp()}.json`;
   const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
   const url = URL.createObjectURL(blob);
@@ -1816,7 +1989,7 @@ function downloadJSON() {
 
 function downloadMissionProject() {
   const project = buildMissionProjectFromState();
-  const envSafe = state.constraints.environment.toLowerCase();
+  const envSafe = (state.constraints.environment || 'env').toLowerCase();
   const fileName = `mission_project_${state.constraints.durationHours}h_${envSafe}_${formatTimestamp()}.json`;
   const blob = new Blob([JSON.stringify(project, null, 2)], { type: 'application/json' });
   const url = URL.createObjectURL(blob);
@@ -1848,21 +2021,36 @@ function buildManifest(xmlName, jsonPath) {
 
 async function exportAtakMissionPackage() {
   const payload = buildExportPayload();
-  const envSafe = state.constraints.environment.toLowerCase();
+  const envSafe = (state.constraints.environment || 'env').toLowerCase();
   const timestamp = formatTimestamp();
   const jsonName = `kitsmith/kit_${timestamp}.json`;
   const missionProjectName = `kitsmith/mission_project_${timestamp}.json`;
   const geoName = `kitsmith/mission_${timestamp}.geojson`;
   const cotName = `kitsmith/mission_${timestamp}_cot.json`;
+  const summaryName = `kitsmith/kit_summary_${timestamp}.json`;
+  const checklistName = `kitsmith/kit_checklist_${timestamp}.txt`;
   const manifestName = 'MANIFEST/manifest.xml';
   const packageName = `KitSmith_MissionPackage_${state.constraints.durationHours}h_${envSafe}_${timestamp}.zip`;
   const manifest = buildManifest(`KitSmith_${state.constraints.durationHours}h_${state.constraints.environment}_${timestamp}`, jsonName);
+  const checklistText = buildChecklistText();
+  const summary = {
+    constraints: state.constraints,
+    kits: state.kits.map((kit) => ({
+      id: kit.id,
+      name: kit.name,
+      role: kit.role,
+      totals: calculateKitTotals(kit),
+      items: buildKitItemDetails(kit),
+    })),
+  };
 
   const zip = new JSZip();
   zip.file(jsonName, JSON.stringify(payload, null, 2));
   zip.file(missionProjectName, JSON.stringify(payload.missionProject, null, 2));
   zip.file(geoName, JSON.stringify(payload.geojson, null, 2));
   zip.file(cotName, JSON.stringify(payload.cot, null, 2));
+  zip.file(summaryName, JSON.stringify(summary, null, 2));
+  zip.file(checklistName, checklistText);
   zip.file(manifestName, manifest);
   const blob = await zip.generateAsync({ type: 'blob' });
   const url = URL.createObjectURL(blob);
@@ -1959,6 +2147,8 @@ function attachEvents() {
   elements.packingListsContent.addEventListener('click', handleAssignmentActions);
   document.getElementById('demo-recon').addEventListener('click', () => applyPreset('recon24'));
   document.getElementById('demo-uxs').addEventListener('click', () => applyPreset('uxs48'));
+  const sustainmentBtn = document.getElementById('demo-sustainment');
+  if (sustainmentBtn) sustainmentBtn.addEventListener('click', () => applyPreset('sustainment48'));
   const whitefrostBtn = document.getElementById('demo-whitefrost');
   if (whitefrostBtn) whitefrostBtn.addEventListener('click', () => applyPreset('whitefrost'));
   elements.designImport.addEventListener('change', () => handleFileImport(elements.designImport, importDesigns));

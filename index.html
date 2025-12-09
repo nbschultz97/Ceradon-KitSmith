@@ -129,6 +129,7 @@
 
   <div id="access-gate" role="region" aria-label="Access code gate">
     <h1>Ceradon Systems — Ceradon KitSmith Demo</h1>
+    <p>Ceradon KitSmith is the sustainment/ruck planning component of the Ceradon Architect COTS planning suite.</p>
     <p>Enter your demo access code to continue.</p>
     <label for="demo-code">Access code</label>
     <input id="demo-code" type="password" name="demo-code" autocomplete="off" inputmode="text" />
@@ -168,6 +169,7 @@
           <div class="preset-actions">
             <button id="demo-recon" class="btn-ghost" type="button">Load 24h Recon Patrol</button>
             <button id="demo-uxs" class="btn-ghost" type="button">Load 48h UxS-Heavy Mission</button>
+            <button id="demo-sustainment" class="btn-ghost" type="button">Load demo sustainment scenario</button>
             <button id="demo-whitefrost" class="btn-primary" type="button">Load WHITEFROST Demo</button>
             <button id="reset-constraints" class="btn-ghost" type="button">Reset to Blank</button>
           </div>
@@ -248,7 +250,7 @@
             </div>
           </div>
           <div class="subsection">
-            <p class="eyebrow">Imports</p>
+            <p class="eyebrow">MissionProject-first imports</p>
             <div class="form-grid">
               <label class="full-width">
                 Load Node/Platform designs JSON
@@ -262,7 +264,7 @@
                 Load MissionProject JSON
                 <input type="file" id="mission-project-import" accept="application/json" />
               </label>
-              <p class="muted full-width">Imports are optional. Provide Node/Platform designs to seed kits and items; provide mission metadata to pre-fill duration, environment, team, and safety factor.</p>
+              <p class="muted full-width">Use MissionProject import as the primary entry point. Node/Platform and mission metadata helpers merge into the active MissionProject for refinements.</p>
             </div>
           </div>
         </form>

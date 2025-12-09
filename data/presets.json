@@ -147,6 +147,62 @@
     ]
   },
   {
+    "id": "sustainment48",
+    "label": "Load demo sustainment scenario",
+    "constraints": {
+      "durationHours": 48,
+      "environment": "Rural",
+      "teamSize": 5,
+      "maxWeightPerOperatorKg": 23,
+      "safetyFactor": 1.25,
+      "powerStrategy": {
+        "powerExternal": false,
+        "powerGenerator": true,
+        "powerBatteryOnly": true
+      },
+      "notes": "Neutral sustainment demo: 48h mixed ISR, relay, and team sustainment package."
+    },
+    "kits": [
+      {
+        "name": "ISR kit",
+        "role": "ISR overwatch",
+        "items": {
+          "uxs_quadcopter_scout": 1,
+          "bat_4s_5000": 4,
+          "bat_98wh_brick": 1,
+          "radio_harris_152": 1,
+          "tool_multitool": 1,
+          "sustain_mre": 2,
+          "sustain_water_blader": 1
+        }
+      },
+      {
+        "name": "Relay support kit",
+        "role": "Mesh relay support",
+        "items": {
+          "node_vantage_edge": 2,
+          "bat_98wh_brick": 3,
+          "bat_240wh_station": 1,
+          "power_solar_fold": 1,
+          "tool_tripod": 1,
+          "sustain_mre": 2,
+          "sustain_water_blader": 1
+        }
+      },
+      {
+        "name": "Team sustainment kit",
+        "role": "Base sustainment",
+        "items": {
+          "sustain_mre": 4,
+          "sustain_water_blader": 2,
+          "other_batterycharger": 1,
+          "radio_vhf": 1,
+          "tool_multitool": 1
+        }
+      }
+    ]
+  },
+  {
     "id": "whitefrost",
     "label": "WHITEFROST Demo",
     "constraints": {

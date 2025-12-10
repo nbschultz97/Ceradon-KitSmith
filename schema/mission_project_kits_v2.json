@@ -1,0 +1,167 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://kitsmith.ceradonsystems.com/schema/mission_project_kits_v2.json",
+  "title": "MissionProject Sustainment Schema (KitSmith v2)",
+  "description": "Sustainment-focused subset of the Architect MissionProject envelope used by Ceradon KitSmith.",
+  "type": "object",
+  "required": ["schemaVersion", "kits"],
+  "properties": {
+    "schemaVersion": {
+      "type": "integer",
+      "enum": [2],
+      "description": "KitSmith-aligned MissionProject schema version."
+    },
+    "origin_tool": {
+      "type": "string",
+      "description": "Producer tag for stack tools (kit|node|uxs|mesh|mission|hub)."
+    },
+    "id": { "type": "string" },
+    "name": { "type": "string" },
+    "mission": {
+      "type": "object",
+      "additionalProperties": true,
+      "properties": {
+        "summary": { "type": "string" },
+        "commander_intent": { "type": "string" },
+        "ao": { "type": "string" },
+        "time_window": { "type": "string" }
+      }
+    },
+    "environment": {
+      "type": "object",
+      "additionalProperties": true,
+      "properties": {
+        "terrain": { "type": "string" },
+        "altitude_m": { "type": ["number", "null"] },
+        "temperature_c": { "type": ["number", "null"] },
+        "weather": { "type": "string" },
+        "notes": { "type": "string" }
+      }
+    },
+    "constraints": {
+      "type": "object",
+      "additionalProperties": true,
+      "properties": {
+        "duration_hours": { "type": ["number", "null"] },
+        "team_size": { "type": ["number", "null"] },
+        "max_weight_per_operator_kg": { "type": ["number", "null"] },
+        "safety_factor": { "type": ["number", "null"], "default": 1 },
+        "power_strategy": {
+          "type": "object",
+          "additionalProperties": true,
+          "properties": {
+            "power_external": { "type": "boolean" },
+            "power_generator": { "type": "boolean" },
+            "power_battery_only": { "type": "boolean" }
+          }
+        },
+        "list": {
+          "description": "Optional normalized list for stack tools that expect constraint key/value pairs.",
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["key"],
+            "properties": {
+              "key": { "type": "string" },
+              "value": {}
+            },
+            "additionalProperties": true
+          }
+        }
+      }
+    },
+    "nodes": {
+      "type": "array",
+      "items": { "type": "object", "additionalProperties": true }
+    },
+    "platforms": {
+      "type": "array",
+      "items": { "type": "object", "additionalProperties": true }
+    },
+    "mesh_links": {
+      "type": "array",
+      "items": { "type": "object", "additionalProperties": true }
+    },
+    "kits": {
+      "type": "object",
+      "required": ["definitions", "assignments"],
+      "additionalProperties": true,
+      "properties": {
+        "origin_tool": { "type": "string" },
+        "definitions": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["id", "name", "items"],
+            "additionalProperties": true,
+            "properties": {
+              "id": { "type": "string" },
+              "name": { "type": "string" },
+              "role": { "type": "string" },
+              "intended_role": { "type": "string" },
+              "assigned_element": { "type": "string" },
+              "origin_tool": { "type": "string" },
+              "items": {
+                "description": "Item list (array or id/qty map) accepted by KitSmith; flattened on export.",
+                "oneOf": [
+                  { "type": "object", "additionalProperties": { "type": ["number", "null"] } },
+                  {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "required": ["id", "qty"],
+                      "properties": {
+                        "id": { "type": "string" },
+                        "qty": { "type": ["number", "null"] }
+                      },
+                      "additionalProperties": true
+                    }
+                  }
+                ]
+              },
+              "total_weight_kg": { "type": ["number", "null"] },
+              "total_energy_wh": { "type": ["number", "null"] },
+              "spares": {
+                "description": "Optional spare parts accounting for sustainment math.",
+                "type": "object",
+                "additionalProperties": true
+              }
+            }
+          }
+        },
+        "assignments": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["id", "kitIds"],
+            "additionalProperties": true,
+            "properties": {
+              "id": { "type": "string" },
+              "operator": { "type": "string" },
+              "role": { "type": "string" },
+              "team": { "type": "string" },
+              "kitIds": {
+                "type": "array",
+                "items": { "type": "string" }
+              },
+              "origin_tool": { "type": "string" },
+              "max_weight_kg": { "type": ["number", "null"] },
+              "power_margin_hours": { "type": ["number", "null"] }
+            }
+          }
+        }
+      }
+    },
+    "kits_flat": {
+      "description": "Optional flattened kit list for tools that do not read the nested structure.",
+      "type": "array",
+      "items": { "type": "object", "additionalProperties": true }
+    },
+    "constraints_list": {
+      "description": "Legacy mirror of constraints.list for downstream compatibility.",
+      "type": "array",
+      "items": { "type": "object", "additionalProperties": true }
+    }
+  },
+  "additionalProperties": true
+}

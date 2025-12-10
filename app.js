@@ -2000,8 +2000,9 @@ function downloadMissionProject() {
   URL.revokeObjectURL(url);
 }
 
-function buildManifest(xmlName, jsonPath) {
-  const uid = crypto.randomUUID ? crypto.randomUUID() : `uid_${Date.now()}`;
+function buildManifest(xmlName, jsonPath, missionId) {
+  // Use a deterministic UID to make the ATAK package reproducible and predictable across exports.
+  const uid = missionId || jsonPath.replace(/\W+/g, '_');
   return `
 <MissionPackageManifest version="2">
   <Configuration>
@@ -2031,7 +2032,7 @@ async function exportAtakMissionPackage() {
   const checklistName = `kitsmith/kit_checklist_${timestamp}.txt`;
   const manifestName = 'MANIFEST/manifest.xml';
   const packageName = `KitSmith_MissionPackage_${state.constraints.durationHours}h_${envSafe}_${timestamp}.zip`;
-  const manifest = buildManifest(`KitSmith_${state.constraints.durationHours}h_${state.constraints.environment}_${timestamp}`, jsonName);
+  const manifest = buildManifest(`KitSmith_${state.constraints.durationHours}h_${state.constraints.environment}_${timestamp}`, jsonName, payload.missionProject?.id);
   const checklistText = buildChecklistText();
   const summary = {
     constraints: state.constraints,

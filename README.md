@@ -48,6 +48,11 @@ KitSmith reads and writes a shared **MissionProject** JSON envelope (schema v2, 
 - Mission metadata JSON (duration, environment, safety factor, etc.).
 - Full MissionProject JSON files for round-tripping across the Architect stack.
 
+### MissionProject schema notes
+- KitSmith anchors to `KITSMITH_SCHEMA_VERSION = 2` (exposed in `mission_project.js`).
+- The sustainment-focused schema is published at `schema/mission_project_kits_v2.json` for downstream validation.
+- Imports preserve unknown fields and normalize kits/constraints (`items[]` or `{id: qty}` both accepted); exports re-emit the normalized payload with a `constraints.list` mirror for legacy stack tools.
+
 ## Export formats
 - **JSON:** Download `kitsmith_export.json` containing constraints (including safety factor), kits with totals, operator loads, sustainment flags, and a timestamp. A nested `missionProject` block mirrors the same data for downstream tools.
 - **MissionProject JSON:** First-class import/export buttons round-trip the sustainment view while also emitting `kits[]`, `kits_flat[]`, and `constraints.list` for Architect stack tools.

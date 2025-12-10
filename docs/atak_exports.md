@@ -7,7 +7,7 @@ KitSmith ships an ATAK-friendly export package to keep offline workflows aligned
 - `kitsmith/mission_project_<timestamp>.json`: MissionProject JSON matching `docs/mission_project_schema.md`.
 - `kitsmith/mission_<timestamp>.geojson`: GeoJSON `FeatureCollection` describing nodes, platforms, and mesh links when coordinates are present.
 - `kitsmith/mission_<timestamp>_cot.json`: Lightweight CoT-style stub with units and positions (JSON, not XML) for tactical app bridges.
-- `MANIFEST/manifest.xml`: Simple manifest to satisfy TAK importer expectations.
+- `MANIFEST/manifest.xml`: Simple manifest to satisfy TAK importer expectations (UID derived from MissionProject id for determinism).
 
 ## GeoJSON fields
 - **Feature properties**

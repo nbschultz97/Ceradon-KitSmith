@@ -2,6 +2,9 @@
 
 KitSmith reads and writes a shared **MissionProject** JSON envelope that matches the Ceradon Architect Stack (Node/UxS/Mesh/Mission/KitSmith). The schema is intentionally permissive and tolerant of partial data; unknown fields are preserved.
 
+- Reference JSON Schema: `schema/mission_project_kits_v2.json`
+- Version constant: `KITSMITH_SCHEMA_VERSION` in `mission_project.js` (exported to the window for UI and import/export flows).
+
 ## Top-level fields
 - `schemaVersion` (number): Current version `2`.
 - `id` (string): Stable mission/project id. Generated if missing.
@@ -74,15 +77,22 @@ Each node should keep a **stable id**; KitSmith will generate one if it is absen
 - `definitions[]`
   - `id` (string)
   - `name` (string)
-  - `role` (string)
+  - `role` | `intended_role` (string)
+  - `assigned_element` (string): operator/team hint used in packing lists
   - `origin_tool` (string)
-  - `items` (object): `{ "item_id": qty }`
+  - `items` (object): `{ "item_id": qty }` (arrays with `{id, qty}` also accepted on import)
+  - `total_weight_kg` (number|null): auto-computed on export
+  - `total_energy_wh` (number|null): auto-computed on export
+  - `spares` (object): optional spare parts/power notes
 - `assignments[]`
   - `id` (string)
   - `operator` (string)
   - `role` (string)
+  - `team` (string)
   - `kitIds[]` (array of kit ids)
   - `origin_tool` (string)
+  - `max_weight_kg` (number|null): optional per-operator override
+  - `power_margin_hours` (number|null): optional sustainment buffer
 
 ## Import/export behavior
 - KitSmith auto-generates ids for any node/platform/link/kit without one.

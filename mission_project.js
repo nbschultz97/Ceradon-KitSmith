@@ -1,4 +1,8 @@
-const MISSION_PROJECT_SCHEMA_VERSION = 2;
+// KitSmith uses the stack-wide MissionProject envelope but anchors on a
+// sustainment-focused schema v2. Keep this constant in sync with
+// `schema/mission_project_kits_v2.json`.
+const KITSMITH_SCHEMA_VERSION = 2;
+const MISSION_PROJECT_SCHEMA_VERSION = KITSMITH_SCHEMA_VERSION;
 const MISSION_PROJECT_STORAGE_KEY = 'mission_project';
 const DEFAULT_CONSTRAINT_KEYS = [
   'duration_hours',
@@ -11,7 +15,7 @@ const DEFAULT_CONSTRAINT_KEYS = [
 
 function createEmptyMissionProject() {
   return {
-    schemaVersion: MISSION_PROJECT_SCHEMA_VERSION,
+    schemaVersion: KITSMITH_SCHEMA_VERSION,
     origin_tool: 'kit',
     id: `mission_${Date.now()}`,
     name: 'Untitled Mission',
@@ -52,6 +56,17 @@ function createEmptyMissionProject() {
 
 function normalizeArray(arr) {
   return Array.isArray(arr) ? arr : [];
+}
+
+function normalizeItemsCollection(itemsLike) {
+  if (Array.isArray(itemsLike)) {
+    return itemsLike.reduce((acc, entry) => {
+      if (!entry || !entry.id) return acc;
+      acc[entry.id] = typeof entry.qty === 'number' ? entry.qty : Number(entry.qty) || 0;
+      return acc;
+    }, {});
+  }
+  return itemsLike || {};
 }
 
 function ensureStableId(prefix, value) {
@@ -110,6 +125,7 @@ function normalizeProject(raw) {
         id: ensureStableId('kit', kit.id),
         origin_tool: kit.origin_tool || raw.origin_tool || 'kit',
         ...kit,
+        items: normalizeItemsCollection(kit.items),
       })),
       assignments: normalizeArray(kits.assignments).map((asg, idx) => ({
         id: ensureStableId('asg', asg.id),
@@ -117,7 +133,7 @@ function normalizeProject(raw) {
         ...asg,
       })),
     },
-    schemaVersion: MISSION_PROJECT_SCHEMA_VERSION,
+    schemaVersion: KITSMITH_SCHEMA_VERSION,
   };
 }
 
@@ -144,6 +160,7 @@ function saveMissionProject(project) {
 
 if (typeof window !== 'undefined') {
   window.MISSION_PROJECT_SCHEMA_VERSION = MISSION_PROJECT_SCHEMA_VERSION;
+  window.KITSMITH_SCHEMA_VERSION = KITSMITH_SCHEMA_VERSION;
   window.createEmptyMissionProject = createEmptyMissionProject;
   window.loadMissionProject = loadMissionProject;
   window.saveMissionProject = saveMissionProject;

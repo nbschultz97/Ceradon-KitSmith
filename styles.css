@@ -81,6 +81,16 @@ a:hover {
   flex-wrap: wrap;
 }
 
+.version-chip {
+  padding: 6px 10px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--muted);
+  font-size: 0.9rem;
+  white-space: nowrap;
+}
+
 .nav-link {
   background: transparent;
   border: 1px solid var(--border);
@@ -115,6 +125,15 @@ a:hover {
   .top-bar {
     flex-wrap: wrap;
     gap: 10px;
+  }
+}
+
+@media (max-width: 820px) {
+  .form-grid {
+    grid-template-columns: 1fr;
+  }
+  .top-bar {
+    position: sticky;
   }
 }
 
@@ -175,6 +194,15 @@ a:hover {
   border: 1px solid var(--border);
   border-radius: 12px;
   padding: 10px;
+}
+
+.hint-panel {
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 12px;
+  background: rgba(255, 255, 255, 0.03);
+  margin-bottom: 12px;
+  color: var(--muted);
 }
 
 label {
@@ -534,11 +562,17 @@ legend {
   gap: 6px;
 }
 
+.table-scroll {
+  width: 100%;
+  overflow-x: auto;
+}
+
 .summary-table {
   width: 100%;
   border-collapse: collapse;
   margin-top: 8px;
   font-size: 0.95rem;
+  min-width: 640px;
 }
 
 .summary-table th,
@@ -596,6 +630,31 @@ legend {
   border: 1px dashed var(--border);
   border-radius: 12px;
   color: var(--muted);
+}
+
+.pill-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.status-card {
+  margin: 12px 0;
+  padding: 12px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.02);
+}
+
+.status-card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.status-card-title {
+  margin: 4px 0;
 }
 
 .constraint-bar {
@@ -752,6 +811,7 @@ legend {
   border-collapse: collapse;
   margin-top: 8px;
   font-size: 0.95rem;
+  min-width: 520px;
 }
 
 .packing-table th,
@@ -815,6 +875,37 @@ legend {
 .page-break {
   page-break-after: always;
   break-after: page;
+}
+
+.changelog-panel {
+  grid-column: 1 / -1;
+}
+
+.changelog-entry {
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 10px;
+  background: rgba(255, 255, 255, 0.02);
+}
+
+.changelog-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 6px;
+}
+
+.footer-bar {
+  margin-top: 20px;
+  padding: 12px 16px;
+  border-top: 1px solid var(--border);
+  background: rgba(15, 18, 24, 0.9);
+}
+
+.footer-content {
+  max-width: 1180px;
+  margin: 0 auto;
+  color: var(--muted);
 }
 
 @media (min-width: 640px) {

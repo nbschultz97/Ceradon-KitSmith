@@ -1,4 +1,26 @@
+const APP_VERSION = "KitSmith v0.3.1";
+const MISSIONPROJECT_SCHEMA_VERSION = "2.0.0";
 const STORAGE_KEY = 'kitsmith_state_v1';
+const CHANGE_LOG = [
+  {
+    version: "v0.3.1",
+    date: "2024-06-05",
+    changes: [
+      "Added inline version badges and MissionProject schema callouts across header and footer",
+      "Surfaced MissionProject import schema/version details in Constraints",
+      "Improved responsive tables and access gate alignment with Architect stack keys"
+    ],
+  },
+  {
+    version: "v0.3.0",
+    date: "2024-05-22",
+    changes: [
+      "Expanded sustainment presets including Whitefrost cold-weather demo",
+      "Enhanced MissionProject ingest/export fidelity for schema v2",
+      "Improved operator and packing list rollups"
+    ],
+  },
+];
 const defaultConstraints = {
   durationHours: 24,
   environment: 'Urban',
@@ -550,6 +572,7 @@ const elements = {
   exportContent: document.getElementById('export-content'),
   packingListsContent: document.getElementById('packing-lists-content'),
   snapshotEl: document.getElementById('mission-snapshot'),
+  missionProjectStatus: document.getElementById('mission-project-status'),
   inventoryCount: document.getElementById('inventory-count'),
   constraintsForm: document.getElementById('constraints-form'),
   kitForm: document.getElementById('kit-form'),
@@ -562,6 +585,9 @@ const elements = {
   missionProjectImport: document.getElementById('mission-project-import'),
   importMissionProjectBtn: document.getElementById('import-mission-project'),
   exportMissionProjectBtn: document.getElementById('export-mission-project'),
+  headerVersionBadge: document.getElementById('header-version'),
+  footerVersionBadge: document.getElementById('footer-version'),
+  changeLogEntries: document.getElementById('change-log-entries'),
   addOperatorBtn: document.getElementById('add-operator'),
   printPackingBtn: document.getElementById('print-packing'),
 };
@@ -587,6 +613,31 @@ function setStatusMessage(text, tone = 'info') {
   banner.hidden = false;
   banner.dataset.tone = tone;
   banner.textContent = text;
+}
+
+function renderVersionMeta() {
+  const label = `${APP_VERSION} · MissionProject schema ${MISSIONPROJECT_SCHEMA_VERSION}`;
+  if (elements.headerVersionBadge) elements.headerVersionBadge.textContent = label;
+  if (elements.footerVersionBadge) elements.footerVersionBadge.textContent = label;
+}
+
+function renderChangeLog() {
+  if (!elements.changeLogEntries) return;
+  const entries = [...CHANGE_LOG].sort((a, b) => new Date(b.date) - new Date(a.date));
+  elements.changeLogEntries.innerHTML = entries
+    .map((entry) => {
+      const changeList = (entry.changes || []).map((line) => `<li>${line}</li>`).join('');
+      return `
+        <article class="changelog-entry">
+          <div class="changelog-header">
+            <strong>${entry.version}</strong>
+            <span class="muted">${entry.date}</span>
+          </div>
+          <ul>${changeList}</ul>
+        </article>
+      `;
+    })
+    .join('');
 }
 
 function buildConstraintListSnapshot(constraints) {
@@ -1336,13 +1387,41 @@ function renderMissionSnapshot() {
   const power = powerStrategy.powerExternal ? 'External' : powerStrategy.powerGenerator ? 'Generator' : 'Battery-only';
   const envBits = [environment, altitudeM ? `${altitudeM}m` : null, temperatureC ? `${temperatureC}°C` : null].filter(Boolean).join(' · ');
   elements.snapshotEl.innerHTML = `
-    <span class="pill strong">${durationHours}h</span>
-    <span class="pill">${envBits}</span>
-    <span class="pill">Team ${teamSize}</span>
-    <span class="pill">${maxWeightPerOperatorKg} kg/operator</span>
-    <span class="pill">${power}</span>
-    <span class="pill">Safety ${state.constraints.safetyFactor}x</span>
+    <div class="pill-row">
+      <span class="pill strong">${durationHours}h</span>
+      <span class="pill">${envBits}</span>
+      <span class="pill">Team ${teamSize}</span>
+      <span class="pill">${maxWeightPerOperatorKg} kg/operator</span>
+      <span class="pill">${power}</span>
+      <span class="pill">Safety ${state.constraints.safetyFactor}x</span>
+    </div>
   `;
+
+  if (elements.missionProjectStatus) {
+    const project = state.project || createEmptyMissionProject();
+    const schemaVersion = project.schemaVersion || project.schema_version || MISSIONPROJECT_SCHEMA_VERSION;
+    const missionSummary = [
+      `${durationHours}h`,
+      environment,
+      `Team ${teamSize}`,
+    ].filter(Boolean).join(' · ');
+    const statusText = state.seededFromMissionProject
+      ? 'Loaded from MissionProject import'
+      : 'Ready for MissionProject-first planning';
+    elements.missionProjectStatus.innerHTML = `
+      <div class="status-card">
+        <div class="status-card-header">
+          <div>
+            <p class="eyebrow">MissionProject status</p>
+            <h3 class="status-card-title">${project.name || 'Mission'}</h3>
+          </div>
+          <div class="badge badge-ghost">Schema ${schemaVersion}</div>
+        </div>
+        <p class="muted">${missionSummary}</p>
+        <p class="muted">${statusText}</p>
+      </div>
+    `;
+  }
 }
 
 function renderInventoryList() {
@@ -1518,25 +1597,27 @@ function renderSummaryPanel() {
   const weightStatusClass = readiness.percentWithin === 100 ? 'status-green' : readiness.percentWithin < 50 ? 'status-red' : 'status-amber';
 
   const operatorTable = operatorSummary.length
-    ? `<table class="summary-table">
-        <thead><tr><th>Operator</th><th>Role</th><th>Kits</th><th>Total weight</th><th>Weight margin</th><th>Power 24h</th><th>Power mission</th></tr></thead>
-        <tbody>
-          ${operatorSummary.map((op) => {
-            const weightTone = marginTone((state.constraints.maxWeightPerOperatorKg ? (state.constraints.maxWeightPerOperatorKg - op.totalWeightKg) / state.constraints.maxWeightPerOperatorKg : 0));
-            const power24Tone = marginTone(op.coverage24 - 1);
-            const powerMissionTone = marginTone(op.coverageMission - 1);
-            return `<tr class="${weightTone === 'red' ? 'status-row-red' : ''}">
-              <td>${op.operator}</td>
-              <td>${op.role}</td>
-              <td>${op.kits}</td>
-              <td>${op.totalWeightKg} kg</td>
-              <td><span class="status-chip ${weightTone}">${state.constraints.maxWeightPerOperatorKg ? `${Math.max(0, (state.constraints.maxWeightPerOperatorKg - op.totalWeightKg)).toFixed(1)} kg free` : 'N/A'}</span></td>
-              <td><span class="status-chip ${power24Tone}">${(op.coverage24 * 100).toFixed(0)}% of need</span></td>
-              <td><span class="status-chip ${powerMissionTone}">${(op.coverageMission * 100).toFixed(0)}% of need</span></td>
-            </tr>`;
-          }).join('')}
-        </tbody>
-      </table>`
+    ? `<div class="table-scroll">
+        <table class="summary-table">
+          <thead><tr><th>Operator</th><th>Role</th><th>Kits</th><th>Total weight</th><th>Weight margin</th><th>Power 24h</th><th>Power mission</th></tr></thead>
+          <tbody>
+            ${operatorSummary.map((op) => {
+              const weightTone = marginTone((state.constraints.maxWeightPerOperatorKg ? (state.constraints.maxWeightPerOperatorKg - op.totalWeightKg) / state.constraints.maxWeightPerOperatorKg : 0));
+              const power24Tone = marginTone(op.coverage24 - 1);
+              const powerMissionTone = marginTone(op.coverageMission - 1);
+              return `<tr class="${weightTone === 'red' ? 'status-row-red' : ''}">
+                <td>${op.operator}</td>
+                <td>${op.role}</td>
+                <td>${op.kits}</td>
+                <td>${op.totalWeightKg} kg</td>
+                <td><span class="status-chip ${weightTone}">${state.constraints.maxWeightPerOperatorKg ? `${Math.max(0, (state.constraints.maxWeightPerOperatorKg - op.totalWeightKg)).toFixed(1)} kg free` : 'N/A'}</span></td>
+                <td><span class="status-chip ${power24Tone}">${(op.coverage24 * 100).toFixed(0)}% of need</span></td>
+                <td><span class="status-chip ${powerMissionTone}">${(op.coverageMission * 100).toFixed(0)}% of need</span></td>
+              </tr>`;
+            }).join('')}
+          </tbody>
+        </table>
+      </div>`
     : '<p class="muted">No kits defined.</p>';
 
   const timelineTables = timeline.length
@@ -1546,7 +1627,7 @@ function renderSummaryPanel() {
           const tone = marginTone(row.coverage - 1);
           return `<tr class="${tone === 'red' ? 'status-row-red' : ''}"><td>${row.hours}h</td><td>${Math.ceil(row.requiredWh)} Wh</td><td>${row.modelBatteries}</td><td>${row.safeBatteries}</td><td>${entry.totals.batteryCount}</td><td><span class="status-chip ${tone}">${Math.round(row.coverage * 100)}% of need</span> · ${row.sortieEquivalent} sortie-equiv</td></tr>`;
         }).join('');
-        return `<div class="summary-card"><h4>${header}</h4><p class="muted">Safety factor ${safetyFactor}x applied to requirements.</p><table class="summary-table"><thead><tr><th>Duration</th><th>Model Wh need</th><th>Batteries (model)</th><th>Batteries (safety)</th><th>On hand</th><th>Energy span</th></tr></thead><tbody>${rows}</tbody></table></div>`;
+        return `<div class="summary-card"><h4>${header}</h4><p class="muted">Safety factor ${safetyFactor}x applied to requirements.</p><div class="table-scroll"><table class="summary-table"><thead><tr><th>Duration</th><th>Model Wh need</th><th>Batteries (model)</th><th>Batteries (safety)</th><th>On hand</th><th>Energy span</th></tr></thead><tbody>${rows}</tbody></table></div></div>`;
       }).join('')
     : '<p class="muted">Add kits to see sustainment timelines.</p>';
 
@@ -1782,10 +1863,12 @@ function renderPackingListsView() {
       <div class="packing-section page-break">
         <h3>${kit.name || 'Kit'} — ${kit.role || 'Role'}</h3>
         <p class="muted">Total weight: ${kitTotals.totalWeightKg} kg | Batteries: ${kitTotals.batteryCount}</p>
-        <table class="packing-table">
-          <thead><tr><th>Item</th><th>Qty</th><th>Weight (each)</th><th>Check</th></tr></thead>
-          <tbody>${rows || '<tr><td colspan="4">No items</td></tr>'}</tbody>
-        </table>
+        <div class="table-scroll">
+          <table class="packing-table">
+            <thead><tr><th>Item</th><th>Qty</th><th>Weight (each)</th><th>Check</th></tr></thead>
+            <tbody>${rows || '<tr><td colspan="4">No items</td></tr>'}</tbody>
+          </table>
+        </div>
       </div>
     `;
   }).join('');
@@ -1800,12 +1883,14 @@ function renderPackingListsView() {
 
   const operatorSummary = buildOperatorSummary();
   const operatorTable = operatorSummary.length
-    ? `<table class="packing-table">
-        <thead><tr><th>Operator</th><th>Role</th><th>Kits</th><th>Total weight</th><th>Limit</th></tr></thead>
-        <tbody>
-          ${operatorSummary.map((op) => `<tr class="${op.overLimit ? 'status-row-red' : ''}"><td>${op.operator}</td><td>${op.role}</td><td>${op.kits}</td><td>${op.totalWeightKg} kg</td><td>${op.overLimit ? 'Over' : 'OK'}</td></tr>`).join('')}
-        </tbody>
-      </table>`
+    ? `<div class="table-scroll">
+        <table class="packing-table">
+          <thead><tr><th>Operator</th><th>Role</th><th>Kits</th><th>Total weight</th><th>Limit</th></tr></thead>
+          <tbody>
+            ${operatorSummary.map((op) => `<tr class="${op.overLimit ? 'status-row-red' : ''}"><td>${op.operator}</td><td>${op.role}</td><td>${op.kits}</td><td>${op.totalWeightKg} kg</td><td>${op.overLimit ? 'Over' : 'OK'}</td></tr>`).join('')}
+          </tbody>
+        </table>
+      </div>`
     : '<p class="muted">No operators assigned.</p>';
 
   const assignments = state.assignments.length
@@ -2124,6 +2209,8 @@ async function init() {
   await loadInventory();
   hydrateBlank();
   syncConstraintForm();
+  renderVersionMeta();
+  renderChangeLog();
   renderAll();
 }
 

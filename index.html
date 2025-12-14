@@ -143,6 +143,7 @@
         <div class="brand-title">Ceradon KitSmith</div>
         <p class="brand-subtitle">Kit &amp; sustainment planner</p>
       </div>
+      <div class="version-chip" id="header-version"></div>
       <nav class="top-nav" aria-label="Primary">
         <button class="nav-link" type="button" data-scroll="#constraints">Constraints</button>
         <button class="nav-link" type="button" data-scroll="#inventory">Inventory</button>
@@ -174,6 +175,11 @@
             <button id="reset-constraints" class="btn-ghost" type="button">Reset to Blank</button>
           </div>
         </div>
+        <div class="hint-panel">
+          <p class="eyebrow">Cold-weather and LSCO sustainment</p>
+          <p>Use the 24/48/72h presets and the Whitefrost demo as starting points for extended, contested operations while keeping loads COTS-focused and power-aware.</p>
+        </div>
+        <div id="mission-project-status" aria-live="polite"></div>
         <form id="constraints-form" class="form-grid" aria-label="Constraints">
           <div class="subsection">
             <p class="eyebrow">Mission profile</p>
@@ -252,6 +258,7 @@
           <div class="subsection">
             <p class="eyebrow">MissionProject-first imports</p>
             <div class="form-grid">
+              <p class="muted full-width">Architect hub and Mission Architect are the recommended sources for a gold MissionProject JSON. Use these helpers to merge designs and mission metadata into the same envelope.</p>
               <label class="full-width">
                 Load Node/Platform designs JSON
                 <input type="file" id="design-import" accept="application/json" />
@@ -353,7 +360,22 @@
         <div id="export-content" class="stack"></div>
         <div id="clipboard-status" class="muted" role="status" aria-live="polite"></div>
       </section>
+      <section id="change-log" class="panel changelog-panel">
+        <div class="panel-header">
+          <div>
+            <p class="eyebrow">Release notes</p>
+            <h2>Change Log</h2>
+          </div>
+        </div>
+        <div id="change-log-entries" class="stack"></div>
+      </section>
     </main>
+
+    <footer class="footer-bar">
+      <div class="footer-content">
+        <span id="footer-version"></span>
+      </div>
+    </footer>
 
     <template id="kit-template">
       <div class="kit-card">
@@ -397,7 +419,7 @@
   <script>
     (function () {
       const ACCESS_CODE = "KIT-FORGE-219";
-      const STORAGE_KEY = "ceradonDemoAuthorized";
+      const STORAGE_KEY = "ceradon_demo_code";
 
       const gate = document.getElementById("access-gate");
       const appRoot = document.getElementById("app-root");
@@ -421,7 +443,7 @@
       function validateCode() {
         const value = (input.value || "").trim();
         if (value === ACCESS_CODE) {
-          localStorage.setItem(STORAGE_KEY, "true");
+          localStorage.setItem(STORAGE_KEY, value);
           error.style.display = "none";
           showApp();
         } else {
@@ -430,9 +452,13 @@
       }
 
       document.addEventListener("DOMContentLoaded", () => {
-        if (localStorage.getItem(STORAGE_KEY) === "true") {
-          showApp();
-          return;
+        const cachedCode = localStorage.getItem(STORAGE_KEY);
+        if (cachedCode) {
+          input.value = cachedCode;
+          if (cachedCode === ACCESS_CODE) {
+            showApp();
+            return;
+          }
         }
 
         showGate();

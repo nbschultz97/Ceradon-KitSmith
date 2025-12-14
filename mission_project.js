@@ -2,7 +2,7 @@
 // sustainment-focused schema v2. Keep this constant in sync with
 // `schema/mission_project_kits_v2.json`.
 const KITSMITH_SCHEMA_VERSION = 2;
-const MISSION_PROJECT_SCHEMA_VERSION = KITSMITH_SCHEMA_VERSION;
+const MISSION_PROJECT_SCHEMA_VERSION = "2.0.0";
 const MISSION_PROJECT_STORAGE_KEY = 'mission_project';
 const DEFAULT_CONSTRAINT_KEYS = [
   'duration_hours',

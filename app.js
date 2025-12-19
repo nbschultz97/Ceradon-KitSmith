@@ -1,7 +1,17 @@
-const APP_VERSION = "KitSmith v0.3.1";
+const APP_VERSION = "KitSmith Web v1.3";
 const MISSIONPROJECT_SCHEMA_VERSION = "2.0.0";
 const STORAGE_KEY = 'kitsmith_state_v1';
 const CHANGE_LOG = [
+  {
+    version: "v1.3.0",
+    date: "2024-07-15",
+    changes: [
+      "Hardened access gate with localStorage unlock flag and optional demo request CTA",
+      "Added demo sustainment bootstrapper seeded from MissionProject WHITEFROST baseline",
+      "Introduced sustainment risk visualization and mesh-aware kit suggestions",
+      "Tagged C-UAS/EW sustainment items with filters and schema/version callouts",
+    ],
+  },
   {
     version: "v0.3.1",
     date: "2024-06-05",
@@ -480,7 +490,7 @@ const fallbackInventory = [
     weight_g: 720,
     energy_wh: 98,
     volume_l: 0.65,
-    tags: ['comms', 'mission', 'carry-on'],
+    tags: ['comms', 'mission', 'carry-on', 'rf_spare', 'cuas_support'],
     notes: 'Commercial airline safe; pair with 12V adapter.',
   },
   {
@@ -490,7 +500,7 @@ const fallbackInventory = [
     weight_g: 2100,
     energy_wh: 240,
     volume_l: 1.9,
-    tags: ['recharge', 'generator'],
+    tags: ['recharge', 'generator', 'cuas_support', 'rf_spare'],
     notes: 'Base battery for charging handsets and tablets.',
   },
   {
@@ -500,7 +510,7 @@ const fallbackInventory = [
     weight_g: 870,
     energy_wh: 16,
     volume_l: 0.7,
-    tags: ['VHF', 'UHF', 'voice'],
+    tags: ['VHF', 'UHF', 'voice', 'rf_spare'],
     notes: 'Standard handheld; include spare battery.',
   },
   {
@@ -510,7 +520,7 @@ const fallbackInventory = [
     weight_g: 980,
     energy_wh: 45,
     volume_l: 1.2,
-    tags: ['mesh', 'c2', 'vantage'],
+    tags: ['mesh', 'c2', 'vantage', 'cuas_support', 'ew_tool'],
     notes: 'Edge compute for RF/Vantage kits; CSI-capable.',
   },
   {
@@ -550,7 +560,7 @@ const fallbackInventory = [
     weight_g: 940,
     energy_wh: null,
     volume_l: 3.3,
-    tags: ['sensors', 'node'],
+    tags: ['sensors', 'node', 'cuas_support'],
     notes: 'Light tripod for antennas or sensors.',
   },
   {
@@ -570,7 +580,7 @@ const fallbackInventory = [
     weight_g: 2100,
     energy_wh: null,
     volume_l: 4.0,
-    tags: ['charging', 'silent'],
+    tags: ['charging', 'silent', 'cuas_support'],
     notes: 'Silent sustainment option; pair with station battery.',
   },
 ];
@@ -586,6 +596,7 @@ const state = {
   statusMessage: '',
   seededFromMissionProject: false,
   operatorSort: { key: 'operator', direction: 'asc' },
+  meshContext: { suggestions: [] },
 };
 
 function normalizeKitsData(kitsLike) {
@@ -636,6 +647,7 @@ const elements = {
   snapshotEl: document.getElementById('mission-snapshot'),
   missionProjectStatus: document.getElementById('mission-project-status'),
   inventoryCount: document.getElementById('inventory-count'),
+  cuasFilter: document.getElementById('filter-cuas'),
   constraintsForm: document.getElementById('constraints-form'),
   kitForm: document.getElementById('kit-form'),
   kitNameInput: document.getElementById('kit-name-input'),
@@ -652,10 +664,16 @@ const elements = {
   changeLogEntries: document.getElementById('change-log-entries'),
   addOperatorBtn: document.getElementById('add-operator'),
   printPackingBtn: document.getElementById('print-packing'),
+  meshSuggestions: document.getElementById('mesh-suggestions'),
 };
 
 function structuredClone(obj) {
   return JSON.parse(JSON.stringify(obj));
+}
+
+function normalizeSchemaVersion(value) {
+  if (value === undefined || value === null) return '';
+  return `${value}`;
 }
 
 function escapeHtml(str = '') {
@@ -752,6 +770,7 @@ function buildKitItemDetails(kit) {
       qty: qty || 0,
       weight_kg,
       energy_wh,
+      tags: item.tags || [],
     };
   });
 }
@@ -774,6 +793,9 @@ function buildMissionProjectFromState() {
   const kitsSummary = buildKitsSummary();
   const project = {
     ...base,
+    schemaVersion: state.project?.schemaVersion || KITSMITH_SCHEMA_VERSION,
+    schema_version: state.project?.schema_version || MISSIONPROJECT_SCHEMA_VERSION,
+    source_schema_version: base.schemaVersion && base.schemaVersion !== KITSMITH_SCHEMA_VERSION ? base.schemaVersion : undefined,
     origin_tool: 'kit',
     name: base.name || 'KitSmith mission',
     constraints: {
@@ -823,6 +845,12 @@ function buildMissionProjectFromState() {
     kitsSummary,
     constraints_list: constraintsList,
     kits_flat: [],
+  };
+  project.sustainment = {
+    ...(base.sustainment || {}),
+    constraints: project.constraints,
+    kits: project.kits,
+    kitsSummary,
   };
   project.kits_flat = project.kits.definitions;
   return project;
@@ -886,6 +914,23 @@ async function loadPresets() {
   } catch (err) {
     console.warn('Preset load fallback', err);
     state.presets = fallbackPresets;
+  }
+}
+
+async function loadDemoSustainment() {
+  try {
+    const res = await fetch('data/demo_mission_whitefrost.json');
+    if (!res.ok) throw new Error('Demo mission fetch failed');
+    const payload = await res.json();
+    ingestMissionProject(payload, { quiet: true });
+    renderAll();
+    persistState();
+    setStatusMessage('Demo sustainment scenario loaded (WHITEFROST baseline)', 'info');
+  } catch (err) {
+    console.warn('Demo sustainment load fallback', err);
+    applyPreset('whitefrost');
+    if (!state.kits.length) applyPreset('sustainment48');
+    setStatusMessage('Loaded sustainment preset fallback', 'warning');
   }
 }
 
@@ -1083,6 +1128,11 @@ function ingestMissionProject(payload, options = {}) {
   const project = saveMissionProject(payload || {});
   state.project = project;
   state.seededFromMissionProject = true;
+  const incomingSchema = normalizeSchemaVersion(project.schemaVersion || project.schema_version);
+  const targetSchema = normalizeSchemaVersion(KITSMITH_SCHEMA_VERSION);
+  if (!opts.quiet && incomingSchema && incomingSchema !== targetSchema) {
+    setStatusMessage(`MissionProject schema ${incomingSchema} imported; KitSmith targets ${targetSchema}`, 'warning');
+  }
   applyConstraintsFromProject(project.constraints || {}, project.environment || {});
 
   const kitsSection = project.kits || {};
@@ -1254,6 +1304,12 @@ function addItemToKit(kitId, itemId) {
   persistState();
 }
 
+function addSuggestedItemToKit(kitId, itemId, qty = 1) {
+  for (let i = 0; i < qty; i += 1) {
+    addItemToKit(kitId, itemId);
+  }
+}
+
 function adjustItemQuantity(kitId, itemId, delta) {
   const kit = state.kits.find((k) => k.id === kitId);
   if (!kit || !kit.items[itemId]) return;
@@ -1392,6 +1448,73 @@ function calculateTeamEnergyStatus() {
   };
 }
 
+function buildRiskVisualization(energyStatus) {
+  const duration = state.constraints.durationHours || 0;
+  const coverage = energyStatus.coverage || 0;
+  const availableHours = duration * coverage;
+  const pct = duration > 0 ? Math.min(100, (availableHours / duration) * 100) : 0;
+  const tone = coverage >= 1.2 ? 'green' : coverage >= 0.9 ? 'amber' : 'red';
+  const bufferHours = Math.max(0, availableHours - duration);
+  const riskLabel = tone === 'green' ? 'Low risk' : tone === 'amber' ? 'Monitor' : 'High risk';
+  return `
+    <div class="risk-chart" role="img" aria-label="Battery sustainment risk">
+      <div class="risk-metrics">
+        <span>Duration: ${duration}h</span>
+        <span>Available: ${availableHours.toFixed(1)}h eq.</span>
+        <span class="risk-pill ${tone}">${riskLabel}</span>
+      </div>
+      <div class="risk-bar" aria-hidden="true">
+        <div class="risk-required"></div>
+        <div class="risk-available ${tone}" style="width:${pct}%;"></div>
+      </div>
+      <p class="muted small-text">${bufferHours > 0 ? `${bufferHours.toFixed(1)}h buffer beyond mission` : 'Shortfall vs mission duration once safety factor applied'}.</p>
+    </div>
+  `;
+}
+
+function deriveMeshContext(projectOverride) {
+  const project = projectOverride || state.project || createEmptyMissionProject();
+  const meshLinks = Array.isArray(project.mesh_links) ? project.mesh_links : [];
+  const nodes = Array.isArray(project.nodes) ? project.nodes : [];
+  const meshPlan = project.meshPlan || project.mesh_plan || {};
+  const constraints = project.constraints || {};
+  const durationHours = state.constraints.durationHours || constraints.duration_hours || 24;
+  const suggestions = {};
+  const addSuggestion = (itemId, qty, reason) => {
+    if (!state.inventoryById[itemId]) return;
+    if (!suggestions[itemId]) suggestions[itemId] = { itemId, qty: 0, reason };
+    suggestions[itemId].qty += qty;
+    suggestions[itemId].reason = reason;
+  };
+
+  const criticalRelays = meshLinks.filter((link) => link.critical || /relay/i.test(link.role || '') || /relay/i.test(link.notes || '')).length;
+  const hasMesh = meshLinks.length > 0 || nodes.some((node) => /mesh|relay|node/i.test(node.role || node.name || ''));
+  const durationDays = Math.max(1, Math.ceil(durationHours / 24));
+  const ewLevel = (meshPlan.ewLevel || meshPlan.ew_level || meshPlan.ew || project.environment?.ewLevel || 'medium').toString().toLowerCase();
+
+  if (hasMesh) {
+    addSuggestion('node_vantage_edge', Math.max(1, criticalRelays), 'Critical relays benefit from spare mesh nodes');
+    addSuggestion('bat_240wh_station', 1, 'Station battery for backhaul and relay uptime');
+    addSuggestion('bat_98wh_brick', Math.max(durationDays, criticalRelays * 2), 'Battery sustainment for mesh nodes');
+  }
+
+  if (ewLevel === 'high' || ewLevel === 'severe') {
+    addSuggestion('power_solar_fold', 1, 'EW threat: prioritize silent charging for relays');
+    addSuggestion('tool_tripod', 1, 'Elevated antenna/relay positioning under EW pressure');
+  }
+
+  const roamingNodes = meshPlan.roamingNodes || meshPlan.roaming_nodes || 0;
+  if (roamingNodes > 0) addSuggestion('node_vantage_edge', roamingNodes, 'Roaming nodes need spare endpoints');
+
+  return {
+    suggestions: Object.values(suggestions),
+    meshLinks: meshLinks.length,
+    criticalRelays,
+    ewLevel: ewLevel || 'medium',
+    hasMesh,
+  };
+}
+
 function buildOperatorSummary() {
   const { maxWeightPerOperatorKg } = state.constraints;
   const assignments = state.assignments.length
@@ -1507,7 +1630,7 @@ function renderMissionSnapshot() {
 
   if (elements.missionProjectStatus) {
     const project = state.project || createEmptyMissionProject();
-    const schemaVersion = project.schemaVersion || project.schema_version || MISSIONPROJECT_SCHEMA_VERSION;
+    const schemaVersion = normalizeSchemaVersion(project.schemaVersion || project.schema_version || MISSIONPROJECT_SCHEMA_VERSION);
     const missionSummary = [
       `${durationHours}h`,
       environment,
@@ -1516,7 +1639,10 @@ function renderMissionSnapshot() {
     const statusText = state.seededFromMissionProject
       ? 'Loaded from MissionProject import'
       : 'Ready for MissionProject-first planning';
-  elements.missionProjectStatus.innerHTML = `
+    const schemaNote = schemaVersion && schemaVersion !== normalizeSchemaVersion(KITSMITH_SCHEMA_VERSION)
+      ? `<span class="badge badge-warning">Schema mismatch (kit ${KITSMITH_SCHEMA_VERSION})</span>`
+      : '';
+    elements.missionProjectStatus.innerHTML = `
       <div class="status-card">
         <div class="status-card-header">
           <div>
@@ -1527,6 +1653,7 @@ function renderMissionSnapshot() {
         </div>
         <p class="muted">${missionSummary}</p>
         <p class="muted">${statusText}</p>
+        ${schemaNote}
       </div>
     `;
   }
@@ -1575,13 +1702,16 @@ function renderInventoryList() {
   const categoryFilterBtn = document.querySelector('.filter-button.active');
   const categoryFilter = categoryFilterBtn ? categoryFilterBtn.dataset.category : 'all';
   const textFilter = document.getElementById('filter-text').value.toLowerCase();
+  const cuasOnly = elements.cuasFilter?.checked;
 
   const filtered = state.inventory.filter((item) => {
     const matchesCategory = categoryFilter === 'all' || item.category === categoryFilter;
     const matchesText = !textFilter ||
       item.name.toLowerCase().includes(textFilter) ||
       (item.tags || []).some((tag) => tag.toLowerCase().includes(textFilter));
-    return matchesCategory && matchesText;
+    const cuasTagged = (item.tags || []).some((tag) => ['rf_spare', 'cuas_support', 'ew_tool'].includes(tag));
+    const matchesCuas = !cuasOnly || cuasTagged;
+    return matchesCategory && matchesText && matchesCuas;
   });
 
   elements.inventoryCount.textContent = `Showing ${filtered.length} of ${state.inventory.length} items`;
@@ -1717,6 +1847,45 @@ function renderKitsPanel() {
 
     elements.kitsContainer.appendChild(clone);
   });
+
+  renderMeshSuggestions();
+}
+
+function renderMeshSuggestions() {
+  if (!elements.meshSuggestions) return;
+  const ctx = state.meshContext || deriveMeshContext();
+  if (!state.kits.length) {
+    elements.meshSuggestions.innerHTML = '<div class="summary-card"><p class="muted">Create a kit to apply mesh-driven suggestions.</p></div>';
+    return;
+  }
+
+  const targetKit = state.kits.find((kit) => /mesh|relay|node/i.test(`${kit.name} ${kit.role}`)) || state.kits[0];
+  const kitOptions = state.kits.map((kit) => `<option value="${kit.id}" ${kit.id === targetKit.id ? 'selected' : ''}>${kit.name || 'Kit'}</option>`).join('');
+  const suggestionList = (ctx.suggestions || [])
+    .map((suggestion) => {
+      const item = state.inventoryById[suggestion.itemId];
+      if (!item) return '';
+      return `<li>
+        <div>
+          <strong>${item.name}</strong> <span class="pill">x${suggestion.qty}</span>
+          <p class="muted small-text">${suggestion.reason || 'Mesh-derived recommendation'}</p>
+        </div>
+        <div class="suggestion-actions">
+          <select class="suggestion-kit" data-item="${suggestion.itemId}">${kitOptions}</select>
+          <button class="btn-primary apply-suggestion" data-item="${suggestion.itemId}" data-qty="${suggestion.qty}">Add to kit</button>
+        </div>
+      </li>`;
+    })
+    .join('');
+
+  elements.meshSuggestions.innerHTML = `
+    <div class="summary-card">
+      <h3>Suggested items</h3>
+      <p class="muted">Mesh links: ${ctx.meshLinks || 0} · Critical relays: ${ctx.criticalRelays || 0} · EW level: ${ctx.ewLevel || 'n/a'}</p>
+      ${suggestionList ? `<ul class="suggestion-list">${suggestionList}</ul>` : '<p class="muted">No mesh-driven suggestions detected.</p>'}
+      ${suggestionList ? `<button class="btn-ghost apply-all-suggestions" type="button" data-kit="${targetKit.id}">Apply all to ${targetKit.name || 'Kit'}</button>` : ''}
+    </div>
+  `;
 }
 
 function renderSummaryPanel() {
@@ -1726,6 +1895,7 @@ function renderSummaryPanel() {
   const operatorSummary = sortOperators(buildOperatorSummary());
   const timeline = buildSustainmentTimeline();
   const energyStatus = calculateTeamEnergyStatus();
+  const riskViz = buildRiskVisualization(energyStatus);
   const teamLimit = maxWeightPerOperatorKg && teamSize ? maxWeightPerOperatorKg * teamSize : 0;
   const teamWeightMargin = teamLimit ? (teamLimit - teamWeight) / teamLimit : 0;
   const teamWeightTone = marginTone(teamWeightMargin);
@@ -1809,6 +1979,7 @@ function renderSummaryPanel() {
         <li>Team load <span class="status-chip ${teamWeightTone}">${teamWeight} kg${teamLimit ? ` / ${teamLimit} kg cap` : ''}</span></li>
         <li>Power margin <span class="status-chip ${energyTone}">${powerCoveragePct}% of ${durationHours}h need</span> (${energyStatus.availableWh} Wh on hand vs ${energyStatus.requiredWh} Wh required)</li>
       </ul>
+      ${riskViz}
     </div>
     <div class="summary-grid">
       <div class="summary-tile">
@@ -1916,6 +2087,33 @@ function handleInventoryActions(e) {
     kitId = created;
   }
   addItemToKit(kitId, itemId);
+}
+
+function handleSuggestionActions(e) {
+  const apply = e.target.closest('.apply-suggestion');
+  const applyAll = e.target.closest('.apply-all-suggestions');
+  if (apply) {
+    const itemId = apply.dataset.item;
+    const qty = Number(apply.dataset.qty) || 1;
+    const select = apply.parentElement.querySelector('.suggestion-kit');
+    const kitId = select?.value || state.kits[0]?.id;
+    if (!kitId) {
+      setStatusMessage('Create a kit before applying suggestions', 'warning');
+      return;
+    }
+    addSuggestedItemToKit(kitId, itemId, qty);
+    return;
+  }
+
+  if (applyAll) {
+    const kitId = applyAll.dataset.kit || state.kits[0]?.id;
+    if (!kitId) {
+      setStatusMessage('Create a kit before applying suggestions', 'warning');
+      return;
+    }
+    (state.meshContext?.suggestions || []).forEach((sug) => addSuggestedItemToKit(kitId, sug.itemId, sug.qty));
+    setStatusMessage('Mesh-driven recommendations applied', 'info');
+  }
 }
 
 function handleAssignmentActions(e) {
@@ -2367,6 +2565,7 @@ function handleNavScroll() {
 }
 
 function renderAll() {
+  state.meshContext = deriveMeshContext();
   renderInventoryList();
   renderKitsPanel();
   renderSummaryPanel();
@@ -2392,6 +2591,7 @@ function attachEvents() {
   elements.constraintsForm.addEventListener('input', updateConstraintsFromForm);
   document.getElementById('reset-constraints').addEventListener('click', resetConstraintsForm);
   document.getElementById('filter-text').addEventListener('input', renderInventoryList);
+  if (elements.cuasFilter) elements.cuasFilter.addEventListener('change', renderInventoryList);
   elements.categoryButtons.addEventListener('click', handleCategoryClick);
   elements.inventoryListEl.addEventListener('click', handleInventoryActions);
   document.getElementById('kits-container').addEventListener('click', handleInventoryActions);
@@ -2408,6 +2608,7 @@ function attachEvents() {
   elements.packingListsContent.addEventListener('input', handleAssignmentActions);
   elements.packingListsContent.addEventListener('change', handleAssignmentActions);
   elements.packingListsContent.addEventListener('click', handleAssignmentActions);
+  if (elements.meshSuggestions) elements.meshSuggestions.addEventListener('click', handleSuggestionActions);
   document.getElementById('demo-recon').addEventListener('click', () => applyPreset('recon24'));
   document.getElementById('demo-uxs').addEventListener('click', () => applyPreset('uxs48'));
   const sustainmentBtn = document.getElementById('demo-sustainment');
@@ -2428,4 +2629,5 @@ function attachEvents() {
   document.addEventListener('scroll', handleNavScroll, { passive: true });
 }
 
+window.loadDemoSustainment = loadDemoSustainment;
 document.addEventListener('DOMContentLoaded', init);

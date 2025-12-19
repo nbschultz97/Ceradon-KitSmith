@@ -130,11 +130,14 @@
   <div id="access-gate" role="region" aria-label="Access code gate">
     <h1>Ceradon Systems — Ceradon KitSmith Demo</h1>
     <p>Ceradon KitSmith is the sustainment/ruck planning component of the Ceradon Architect COTS planning suite.</p>
-    <p>Enter your demo access code to continue.</p>
+    <p>Enter the access code provided by Ceradon Systems.</p>
     <label for="demo-code">Access code</label>
     <input id="demo-code" type="password" name="demo-code" autocomplete="off" inputmode="text" />
     <button id="demo-enter" type="button">Enter</button>
     <div id="demo-error" aria-live="polite">Invalid code. Please check and try again.</div>
+    <p class="muted small-text">
+      Need help? <a href="mailto:contact@ceradonsystems.com?subject=Demo%20code%20request%20%E2%80%93%20Ceradon%20KitSmith">Request a demo code</a>.
+    </p>
   </div>
 
   <div id="app-root">
@@ -288,6 +291,9 @@
           <div class="filters sticky-filter">
             <div class="filter-buttons" id="category-buttons" aria-label="Category filters"></div>
             <input id="filter-text" type="search" placeholder="Search name or tag" />
+            <label class="filter-toggle">
+              <input id="filter-cuas" type="checkbox" /> Show C-UAS/EW sustainment items
+            </label>
             <div id="inventory-count" class="muted"></div>
           </div>
         </div>
@@ -319,6 +325,7 @@
           </div>
         </div>
         <div id="kits-container" class="stack"></div>
+        <div id="mesh-suggestions" class="stack"></div>
       </section>
 
       <section id="summary" class="panel summary-panel">
@@ -429,8 +436,9 @@
   <script src="app.js"></script>
   <script>
     (function () {
-      const ACCESS_CODE = "KIT-FORGE-219";
-      const STORAGE_KEY = "ceradon_demo_code";
+      const DEMO_ACCESS_CODE = "KIT-FORGE-219";
+      const LEGACY_CODE_KEY = "ceradon_demo_code";
+      const ACCESS_GRANTED_KEY = "kitsmith_access_granted";
 
       const gate = document.getElementById("access-gate");
       const appRoot = document.getElementById("app-root");
@@ -451,25 +459,45 @@
         if (demoRequest) demoRequest.style.display = "none";
       }
 
+      function scrollToMissionInputs() {
+        const target = document.querySelector('#constraints');
+        if (target) target.scrollIntoView({ behavior: 'smooth' });
+      }
+
+      async function grantAccess({ firstUnlock = false } = {}) {
+        localStorage.setItem(ACCESS_GRANTED_KEY, 'true');
+        localStorage.removeItem(LEGACY_CODE_KEY);
+        error.style.display = "none";
+        showApp();
+        if (firstUnlock && window.loadDemoSustainment) {
+          await window.loadDemoSustainment();
+        }
+        scrollToMissionInputs();
+      }
+
       function validateCode() {
         const value = (input.value || "").trim();
-        if (value === ACCESS_CODE) {
-          localStorage.setItem(STORAGE_KEY, value);
-          error.style.display = "none";
-          showApp();
+        if (value === DEMO_ACCESS_CODE) {
+          const alreadyGranted = localStorage.getItem(ACCESS_GRANTED_KEY) === 'true';
+          grantAccess({ firstUnlock: !alreadyGranted });
         } else {
           error.style.display = "block";
         }
       }
 
       document.addEventListener("DOMContentLoaded", () => {
-        const cachedCode = localStorage.getItem(STORAGE_KEY);
-        if (cachedCode) {
-          input.value = cachedCode;
-          if (cachedCode === ACCESS_CODE) {
-            showApp();
-            return;
-          }
+        const unlocked = localStorage.getItem(ACCESS_GRANTED_KEY) === 'true';
+        const legacy = localStorage.getItem(LEGACY_CODE_KEY);
+
+        if (unlocked) {
+          showApp();
+          scrollToMissionInputs();
+          return;
+        }
+
+        if (legacy && legacy === DEMO_ACCESS_CODE) {
+          grantAccess({ firstUnlock: true });
+          return;
         }
 
         showGate();

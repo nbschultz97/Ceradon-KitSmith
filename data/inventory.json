@@ -16,7 +16,7 @@
     "weight_g": 720,
     "energy_wh": 98,
     "volume_l": 0.65,
-    "tags": ["comms", "mission", "carry-on"],
+    "tags": ["comms", "mission", "carry-on", "rf_spare", "cuas_support"],
     "notes": "Commercial airline safe; pair with 12V adapter."
   },
   {
@@ -26,7 +26,7 @@
     "weight_g": 2100,
     "energy_wh": 240,
     "volume_l": 1.9,
-    "tags": ["recharge", "generator"],
+    "tags": ["recharge", "generator", "cuas_support", "rf_spare"],
     "notes": "Base battery for charging handsets and tablets."
   },
   {
@@ -36,7 +36,7 @@
     "weight_g": 870,
     "energy_wh": 16,
     "volume_l": 0.7,
-    "tags": ["VHF", "UHF", "voice"],
+    "tags": ["VHF", "UHF", "voice", "rf_spare"],
     "notes": "Standard handheld; include spare battery."
   },
   {
@@ -46,7 +46,7 @@
     "weight_g": 980,
     "energy_wh": 45,
     "volume_l": 1.2,
-    "tags": ["mesh", "c2", "vantage"],
+    "tags": ["mesh", "c2", "vantage", "cuas_support", "ew_tool"],
     "notes": "Edge compute for RF/Vantage kits; CSI-capable."
   },
   {
@@ -136,7 +136,7 @@
     "weight_g": 940,
     "energy_wh": null,
     "volume_l": 3.3,
-    "tags": ["sensors", "node"],
+    "tags": ["sensors", "node", "cuas_support"],
     "notes": "Light tripod for antennas or sensors."
   },
   {
@@ -166,7 +166,7 @@
     "weight_g": 2100,
     "energy_wh": null,
     "volume_l": 4.0,
-    "tags": ["charging", "silent"],
+    "tags": ["charging", "silent", "cuas_support"],
     "notes": "Silent sustainment option; pair with station battery."
   }
 ]

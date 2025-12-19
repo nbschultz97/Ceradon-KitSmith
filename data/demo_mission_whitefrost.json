@@ -1,0 +1,114 @@
+{
+  "schemaVersion": 2,
+  "origin_tool": "kit",
+  "id": "mission_whitefrost_demo",
+  "name": "WHITEFROST Sustainment Baseline",
+  "mission": {
+    "summary": "Arctic overwatch with partner support",
+    "commander_intent": "Maintain ISR coverage with resilient mesh",
+    "ao": "WHITEFROST AO",
+    "time_window": "D+3 to D+6"
+  },
+  "environment": {
+    "temperature_c": -15,
+    "altitude_m": 2600,
+    "terrain": "Arctic Mountain",
+    "weather": "Blowing snow",
+    "notes": "High latitude, intermittent aurora, thermal management required"
+  },
+  "constraints": {
+    "duration_hours": 72,
+    "team_size": 6,
+    "max_weight_per_operator_kg": 24,
+    "safety_factor": 1.35,
+    "power_strategy": {
+      "power_external": false,
+      "power_generator": false,
+      "power_battery_only": true
+    },
+    "list": [
+      { "key": "duration_hours", "value": 72 },
+      { "key": "environment", "value": "Arctic Mountain" },
+      { "key": "team_size", "value": 6 },
+      { "key": "max_weight_per_operator_kg", "value": 24 },
+      { "key": "safety_factor", "value": 1.35 }
+    ]
+  },
+  "nodes": [
+    { "id": "whitefrost_core", "name": "Core ISR", "role": "ISR overwatch", "origin_tool": "mesh_architect" },
+    { "id": "whitefrost_relay", "name": "Ridgeline Relay", "role": "Mesh Relay", "origin_tool": "mesh_architect" },
+    { "id": "whitefrost_partner", "name": "Partner Patrol", "role": "Partner", "origin_tool": "mesh_architect" }
+  ],
+  "mesh_links": [
+    { "id": "relay_1", "from": "whitefrost_core", "to": "whitefrost_relay", "range_km": 8, "critical": true, "notes": "Critical relay up high" },
+    { "id": "relay_2", "from": "whitefrost_relay", "to": "whitefrost_partner", "range_km": 6, "critical": true, "notes": "Maintains partner link" },
+    { "id": "backhaul", "from": "whitefrost_core", "to": "whitefrost_partner", "range_km": 5, "critical": false, "notes": "Backhaul fallback" }
+  ],
+  "meshPlan": {
+    "ewLevel": "high",
+    "criticalRelays": 2,
+    "roamingNodes": 1,
+    "linkAvailability": 0.82
+  },
+  "kits": {
+    "origin_tool": "mesh_architect",
+    "definitions": [
+      {
+        "id": "kit_core",
+        "name": "WHITEFROST Core ISR",
+        "role": "Core ISR team",
+        "items": {
+          "uxs_quadcopter_scout": 1,
+          "bat_4s_5000": 4,
+          "bat_98wh_brick": 3,
+          "radio_harris_152": 1,
+          "radio_rto_headset": 1,
+          "sustain_mre_day": 3,
+          "sustain_water_blader": 1,
+          "sustain_cold_layers": 1,
+          "sustain_handwarmers": 1,
+          "sustain_battery_wraps": 1,
+          "tool_multitool": 1
+        }
+      },
+      {
+        "id": "kit_mesh",
+        "name": "WHITEFROST Mesh Relay",
+        "role": "Mesh relay support",
+        "items": {
+          "node_vantage_edge": 2,
+          "bat_98wh_brick": 3,
+          "bat_240wh_station": 1,
+          "power_solar_fold": 1,
+          "tool_tripod": 1,
+          "sustain_mre_day": 2,
+          "sustain_water_blader": 1,
+          "sustain_cold_layers": 1,
+          "sustain_handwarmers": 1,
+          "sustain_battery_wraps": 1
+        }
+      },
+      {
+        "id": "kit_partner",
+        "name": "WHITEFROST Partner Patrol",
+        "role": "Partner-force patrol",
+        "items": {
+          "sustain_mre_day": 4,
+          "sustain_water_blader": 2,
+          "bat_98wh_brick": 2,
+          "radio_harris_152": 1,
+          "other_batterycharger": 1,
+          "sustain_cold_layers": 1,
+          "sustain_spares_pouch": 1
+        }
+      }
+    ],
+    "assignments": []
+  },
+  "kitsSummary": {
+    "sustainment_hours": 72,
+    "max_weight_per_operator_kg": 24,
+    "average_weight_per_operator_kg": 19,
+    "operators": []
+  }
+}

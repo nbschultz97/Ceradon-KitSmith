@@ -204,7 +204,7 @@
   },
   {
     "id": "whitefrost",
-    "label": "WHITEFROST Demo",
+    "label": "WHITEFROST Sustainment",
     "constraints": {
       "durationHours": 72,
       "environment": "Arctic Mountain",
@@ -222,14 +222,19 @@
     },
     "kits": [
       {
-        "name": "WHITEFROST TL",
-        "role": "Lead",
+        "name": "WHITEFROST Core ISR",
+        "role": "Core ISR team",
         "items": {
+          "uxs_quadcopter_scout": 1,
+          "bat_4s_5000": 4,
+          "bat_98wh_brick": 3,
           "radio_harris_152": 1,
           "radio_rto_headset": 1,
-          "bat_98wh_brick": 2,
-          "sustain_mre": 3,
+          "sustain_mre_day": 3,
           "sustain_water_blader": 1,
+          "sustain_cold_layers": 1,
+          "sustain_handwarmers": 1,
+          "sustain_battery_wraps": 1,
           "tool_multitool": 1
         }
       },
@@ -238,34 +243,40 @@
         "role": "Mesh Relay",
         "items": {
           "node_vantage_edge": 2,
-          "bat_98wh_brick": 2,
+          "bat_98wh_brick": 3,
           "bat_240wh_station": 1,
           "power_solar_fold": 1,
           "tool_tripod": 1,
-          "sustain_mre": 2,
-          "sustain_water_blader": 1
+          "sustain_mre_day": 2,
+          "sustain_water_blader": 1,
+          "sustain_cold_layers": 1,
+          "sustain_handwarmers": 1,
+          "sustain_battery_wraps": 1
         }
       },
       {
-        "name": "Scout Quad",
-        "role": "ISR Quad",
+        "name": "WHITEFROST Partner Patrol",
+        "role": "Partner-force patrol",
         "items": {
-          "uxs_quadcopter_scout": 1,
-          "bat_4s_5000": 4,
-          "bat_98wh_brick": 1,
-          "tool_multitool": 1,
-          "sustain_mre": 2,
-          "sustain_water_blader": 1
-        }
-      },
-      {
-        "name": "Partner Sustainment",
-        "role": "Partner Support",
-        "items": {
-          "sustain_mre": 4,
+          "sustain_mre_day": 4,
           "sustain_water_blader": 2,
+          "bat_98wh_brick": 2,
+          "radio_harris_152": 1,
           "other_batterycharger": 1,
-          "bat_98wh_brick": 1
+          "sustain_cold_layers": 1,
+          "sustain_spares_pouch": 1
+        }
+      },
+      {
+        "name": "WHITEFROST Sustainment",
+        "role": "Sustainment cache",
+        "items": {
+          "sustain_mre_day": 6,
+          "sustain_water_blader": 3,
+          "sustain_cold_layers": 1,
+          "sustain_handwarmers": 2,
+          "sustain_battery_wraps": 1,
+          "sustain_spares_pouch": 1
         }
       }
     ]

@@ -13,6 +13,7 @@ KitSmith is a lightweight, browser-based kit and sustainment planner built to al
 - Export the current session as JSON or copy a text-based packing checklist.
 - Generate printable per-kit checklists with line-item checkboxes.
 - Dark, panel-based UI styled after Ceradon UxS Architect for quick adoption in the stack.
+- MissionProject sustainment panel surfaces what KitSmith writes (constraints, kits, kitsSummary) and shows a live snippet for downstream tools.
 
 ## Getting started
 1. Clone the repository.
@@ -41,7 +42,7 @@ For GitHub Pages, set the branch to publish the root of this repository (e.g., `
 - Add or adjust categories and tags to match your kits; the filters are data-driven.
 
 ## Presets, imports, and MissionProject integration
-To seed example kits, edit `app.js` or extend with `data/presets.json`. The UI now ships a **WHITEFROST Demo** preset (72h cold-weather recon) and honors MissionProject imports/exports.
+To seed example kits, edit `app.js` or extend with `data/presets.json`. The UI now ships a **WHITEFROST Sustainment** preset (72h cold-weather recon with layered clothing, battery wraps, water, and spares) and honors MissionProject imports/exports.
 
 KitSmith reads and writes a shared **MissionProject** JSON envelope (schema v2, documented in `docs/mission_project_schema.md`). Imports tolerate partial data and tag entities with `origin_tool` (`kit`, `node`, `mesh`, etc.). You can load:
 - Node/Platform design JSON (arrays of `nodes`, `platforms`, or `kits` with `name`, `role`, and `items: [{"id","qty"}]`).
@@ -52,6 +53,7 @@ KitSmith reads and writes a shared **MissionProject** JSON envelope (schema v2, 
 - KitSmith anchors to `KITSMITH_SCHEMA_VERSION = 2` (exposed in `mission_project.js`).
 - The sustainment-focused schema is published at `schema/mission_project_kits_v2.json` for downstream validation.
 - Imports preserve unknown fields and normalize kits/constraints (`items[]` or `{id: qty}` both accepted); exports re-emit the normalized payload with a `constraints.list` mirror for legacy stack tools.
+- KitSmith writes the sustainment scope of MissionProject: `constraints` (duration, team size, max weight, safety factor, power strategy), `kits.definitions` (items, totals, intended role), `kits.assignments` (operator-to-kit mapping), and a derived `kitsSummary` block that captures sustainment hours plus per-operator weight deltas. The MissionProject integration panel shows a live JSON snippet of these fields for the active session.
 
 ## Export formats
 - **JSON:** Download `kitsmith_export.json` containing constraints (including safety factor), kits with totals, operator loads, sustainment flags, and a timestamp. A nested `missionProject` block mirrors the same data for downstream tools.

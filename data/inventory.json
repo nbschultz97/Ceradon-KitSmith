@@ -80,6 +80,46 @@
     "notes": "One-day sustainment ration."
   },
   {
+    "id": "sustain_cold_layers",
+    "name": "Cold-weather layer set",
+    "category": "Sustainment",
+    "weight_g": 1800,
+    "energy_wh": null,
+    "volume_l": 6.5,
+    "tags": ["whitefrost", "clothing", "arctic"],
+    "notes": "Base/mid/shell layers packaged for WHITEFROST sorties."
+  },
+  {
+    "id": "sustain_handwarmers",
+    "name": "Hand warmers (12)",
+    "category": "Sustainment",
+    "weight_g": 320,
+    "energy_wh": null,
+    "volume_l": 0.6,
+    "tags": ["arctic", "comfort"],
+    "notes": "Air-activated warmers to keep radios and batteries above freezing."
+  },
+  {
+    "id": "sustain_battery_wraps",
+    "name": "Battery insulation wraps",
+    "category": "Sustainment",
+    "weight_g": 420,
+    "energy_wh": null,
+    "volume_l": 0.8,
+    "tags": ["battery", "arctic"],
+    "notes": "Insulation sleeves and heat packs for Li-ion sustainment."
+  },
+  {
+    "id": "sustain_spares_pouch",
+    "name": "Spares & repair pouch",
+    "category": "Sustainment",
+    "weight_g": 950,
+    "energy_wh": null,
+    "volume_l": 1.8,
+    "tags": ["repair", "cold"],
+    "notes": "Tape, straps, zip ties, cables, and optics cloth for WHITEFROST kits."
+  },
+  {
     "id": "sustain_water_blader",
     "name": "2L Water Bladder",
     "category": "Sustainment",

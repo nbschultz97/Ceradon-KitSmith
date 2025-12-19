@@ -243,7 +243,7 @@ const fallbackPresets = [
   },
   {
     id: 'whitefrost',
-    label: 'WHITEFROST Demo',
+    label: 'WHITEFROST Sustainment',
     constraints: {
       durationHours: 72,
       environment: 'Arctic Mountain',
@@ -266,11 +266,14 @@ const fallbackPresets = [
         items: {
           uxs_quadcopter_scout: 1,
           bat_4s_5000: 4,
-          bat_98wh_brick: 2,
+          bat_98wh_brick: 3,
           radio_harris_152: 1,
           radio_rto_headset: 1,
-          sustain_mre: 3,
+          sustain_mre_day: 3,
           sustain_water_blader: 1,
+          sustain_cold_layers: 1,
+          sustain_handwarmers: 1,
+          sustain_battery_wraps: 1,
           tool_multitool: 1,
         },
       },
@@ -279,23 +282,40 @@ const fallbackPresets = [
         role: 'Mesh relay support',
         items: {
           node_vantage_edge: 2,
-          bat_98wh_brick: 2,
+          bat_98wh_brick: 3,
           bat_240wh_station: 1,
           power_solar_fold: 1,
           tool_tripod: 1,
-          sustain_mre: 2,
+          sustain_mre_day: 2,
           sustain_water_blader: 1,
+          sustain_cold_layers: 1,
+          sustain_handwarmers: 1,
+          sustain_battery_wraps: 1,
         },
       },
       {
         name: 'WHITEFROST Partner Patrol',
         role: 'Partner-force patrol',
         items: {
-          sustain_mre: 4,
+          sustain_mre_day: 4,
           sustain_water_blader: 2,
           bat_98wh_brick: 2,
           radio_harris_152: 1,
           other_batterycharger: 1,
+          sustain_cold_layers: 1,
+          sustain_spares_pouch: 1,
+        },
+      },
+      {
+        name: 'WHITEFROST Sustainment',
+        role: 'Sustainment cache',
+        items: {
+          sustain_mre_day: 6,
+          sustain_water_blader: 3,
+          sustain_cold_layers: 1,
+          sustain_handwarmers: 2,
+          sustain_battery_wraps: 1,
+          sustain_spares_pouch: 1,
         },
       },
     ],
@@ -382,6 +402,46 @@ const fallbackInventory = [
     volume_l: 1.0,
     tags: ['food', '24h'],
     notes: 'One-day sustainment ration.',
+  },
+  {
+    id: 'sustain_cold_layers',
+    name: 'Cold-weather layer set',
+    category: 'Sustainment',
+    weight_g: 1800,
+    energy_wh: null,
+    volume_l: 6.5,
+    tags: ['whitefrost', 'clothing', 'arctic'],
+    notes: 'Base/mid/shell layers packaged for WHITEFROST sorties.',
+  },
+  {
+    id: 'sustain_handwarmers',
+    name: 'Hand warmers (12)',
+    category: 'Sustainment',
+    weight_g: 320,
+    energy_wh: null,
+    volume_l: 0.6,
+    tags: ['arctic', 'comfort'],
+    notes: 'Air-activated warmers to keep radios and batteries above freezing.',
+  },
+  {
+    id: 'sustain_battery_wraps',
+    name: 'Battery insulation wraps',
+    category: 'Sustainment',
+    weight_g: 420,
+    energy_wh: null,
+    volume_l: 0.8,
+    tags: ['battery', 'arctic'],
+    notes: 'Insulation sleeves and heat packs for Li-ion sustainment.',
+  },
+  {
+    id: 'sustain_spares_pouch',
+    name: 'Spares & repair pouch',
+    category: 'Sustainment',
+    weight_g: 950,
+    energy_wh: null,
+    volume_l: 1.8,
+    tags: ['repair', 'cold'],
+    notes: 'Tape, straps, zip ties, cables, and optics cloth for WHITEFROST kits.',
   },
   {
     id: 'sustain_water2l',
@@ -525,6 +585,7 @@ const state = {
   presets: [],
   statusMessage: '',
   seededFromMissionProject: false,
+  operatorSort: { key: 'operator', direction: 'asc' },
 };
 
 function normalizeKitsData(kitsLike) {
@@ -569,6 +630,7 @@ const elements = {
   inventoryListEl: document.getElementById('inventory-list'),
   kitsContainer: document.getElementById('kits-container'),
   summaryContent: document.getElementById('summary-content'),
+  missionIntegrationContent: document.getElementById('mission-integration-content'),
   exportContent: document.getElementById('export-content'),
   packingListsContent: document.getElementById('packing-lists-content'),
   snapshotEl: document.getElementById('mission-snapshot'),
@@ -594,6 +656,15 @@ const elements = {
 
 function structuredClone(obj) {
   return JSON.parse(JSON.stringify(obj));
+}
+
+function escapeHtml(str = '') {
+  return String(str)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
 }
 
 function formatTimestamp() {
@@ -651,6 +722,25 @@ function buildConstraintListSnapshot(constraints) {
   ];
 }
 
+function buildKitsSummary() {
+  const operatorLoads = buildOperatorSummary();
+  const { durationHours, maxWeightPerOperatorKg } = state.constraints;
+  const { avgWeight } = calculateTeamSummary();
+  return {
+    sustainment_hours: durationHours,
+    max_weight_per_operator_kg: maxWeightPerOperatorKg,
+    average_weight_per_operator_kg: avgWeight,
+    operators: operatorLoads.map((op) => ({
+      operator: op.operator,
+      role: op.role,
+      weight_kg: op.totalWeightKg,
+      limit_kg: op.limitKg,
+      delta_kg: op.deltaKg,
+      over_limit: op.overLimit,
+    })),
+  };
+}
+
 function buildKitItemDetails(kit) {
   return Object.entries(kit.items || {}).map(([itemId, qty]) => {
     const item = state.inventoryById[itemId] || {};
@@ -681,6 +771,7 @@ function buildMissionProjectFromState() {
   const base = state.project || createEmptyMissionProject();
   const constraintsList = buildConstraintListSnapshot(state.constraints);
   const assignmentMap = mapAssignmentsByKit();
+  const kitsSummary = buildKitsSummary();
   const project = {
     ...base,
     origin_tool: 'kit',
@@ -729,6 +820,7 @@ function buildMissionProjectFromState() {
         kitIds: [...assign.kitIds],
       })),
     },
+    kitsSummary,
     constraints_list: constraintsList,
     kits_flat: [],
   };
@@ -1311,7 +1403,8 @@ function buildOperatorSummary() {
       .map((id) => state.kits.find((kit) => kit.id === id))
       .filter(Boolean);
     const weight = kits.reduce((sum, kit) => sum + calculateKitTotals(kit).totalWeightKg, 0);
-    const over = maxWeightPerOperatorKg ? weight > maxWeightPerOperatorKg : false;
+    const limit = Number(maxWeightPerOperatorKg) || null;
+    const over = limit ? weight > limit : false;
     const baselineWh = kits.reduce((sum, kit) => sum + kitPowerProfile(kit).baselineWhPerHour, 0);
     const totalEnergy = kits.reduce((sum, kit) => sum + calculateKitTotals(kit).totalEnergyWh, 0);
     const safety = state.constraints.safetyFactor || 1;
@@ -1320,14 +1413,29 @@ function buildOperatorSummary() {
       return req > 0 ? totalEnergy / req : 0;
     };
     return {
+      id: assignment.id,
       operator: assignment.operator || `Operator ${idx + 1}`,
       role: assignment.role || 'Role',
       kits: kits.map((k) => k.name || 'Kit').join(', ') || 'Unassigned',
       totalWeightKg: +weight.toFixed(2),
       overLimit: over,
+      limitKg: limit,
+      deltaKg: limit ? +(limit - weight).toFixed(2) : null,
+      loadPct: limit ? +Math.min(200, (weight / limit) * 100).toFixed(1) : null,
       coverage24: coverageFor(24),
       coverageMission: coverageFor(state.constraints.durationHours || 24),
     };
+  });
+}
+
+function sortOperators(summary = []) {
+  const { key, direction } = state.operatorSort || {};
+  const dir = direction === 'desc' ? -1 : 1;
+  return [...summary].sort((a, b) => {
+    const aVal = a?.[key];
+    const bVal = b?.[key];
+    if (typeof aVal === 'number' && typeof bVal === 'number') return (aVal - bVal) * dir;
+    return String(aVal || '').localeCompare(String(bVal || '')) * dir;
   });
 }
 
@@ -1408,7 +1516,7 @@ function renderMissionSnapshot() {
     const statusText = state.seededFromMissionProject
       ? 'Loaded from MissionProject import'
       : 'Ready for MissionProject-first planning';
-    elements.missionProjectStatus.innerHTML = `
+  elements.missionProjectStatus.innerHTML = `
       <div class="status-card">
         <div class="status-card-header">
           <div>
@@ -1422,6 +1530,45 @@ function renderMissionSnapshot() {
       </div>
     `;
   }
+}
+
+function renderMissionIntegrationPanel() {
+  if (!elements.missionIntegrationContent) return;
+  const project = buildMissionProjectFromState();
+  const responsibilities = [
+    'constraints (duration, team size, safety factor, power_strategy)',
+    'kits.definitions (items, totals, intended roles)',
+    'kits.assignments (operator-to-kit mapping)',
+    'kitsSummary (sustainment hours and per-operator loads)',
+  ];
+  const sustainmentSlice = {
+    schemaVersion: project.schemaVersion,
+    origin_tool: project.origin_tool,
+    constraints: {
+      duration_hours: project.constraints.duration_hours,
+      team_size: project.constraints.team_size,
+      max_weight_per_operator_kg: project.constraints.max_weight_per_operator_kg,
+      safety_factor: project.constraints.safety_factor,
+      power_strategy: project.constraints.power_strategy,
+      list: project.constraints.list,
+    },
+    kits: project.kits,
+    kitsSummary: project.kitsSummary,
+  };
+
+  const snippet = escapeHtml(JSON.stringify(sustainmentSlice, null, 2));
+  elements.missionIntegrationContent.innerHTML = `
+    <div class="summary-card">
+      <h3>MissionProject integration</h3>
+      <p class="muted">KitSmith writes sustainment data into the shared MissionProject envelope for Architect and Mesh tools.</p>
+      <ul class="status-list">${responsibilities.map((item) => `<li>${item}</li>`).join('')}</ul>
+    </div>
+    <div class="summary-card mission-snippet">
+      <h3>Live sustainment snippet</h3>
+      <p class="muted">Snapshot reflects the current session and updates as kits or constraints change.</p>
+      <pre>${snippet}</pre>
+    </div>
+  `;
 }
 
 function renderInventoryList() {
@@ -1576,7 +1723,7 @@ function renderSummaryPanel() {
   const { teamWeight, avgWeight, batteryCounts, totalEnergy } = calculateTeamSummary();
   const { maxWeightPerOperatorKg, teamSize, durationHours, environment, safetyFactor } = state.constraints;
   const readiness = calculateMissionReadiness();
-  const operatorSummary = buildOperatorSummary();
+  const operatorSummary = sortOperators(buildOperatorSummary());
   const timeline = buildSustainmentTimeline();
   const energyStatus = calculateTeamEnergyStatus();
   const teamLimit = maxWeightPerOperatorKg && teamSize ? maxWeightPerOperatorKg * teamSize : 0;
@@ -1596,21 +1743,34 @@ function renderSummaryPanel() {
 
   const weightStatusClass = readiness.percentWithin === 100 ? 'status-green' : readiness.percentWithin < 50 ? 'status-red' : 'status-amber';
 
+  const sortMeta = state.operatorSort || {};
+
   const operatorTable = operatorSummary.length
     ? `<div class="table-scroll">
-        <table class="summary-table">
-          <thead><tr><th>Operator</th><th>Role</th><th>Kits</th><th>Total weight</th><th>Weight margin</th><th>Power 24h</th><th>Power mission</th></tr></thead>
+        <table class="summary-table operator-table">
+          <thead>
+            <tr>
+              <th><button class="sort-button ${sortMeta.key === 'operator' ? 'active' : ''}" data-sort="operator">Operator ${sortMeta.key === 'operator' ? (sortMeta.direction === 'asc' ? '↑' : '↓') : ''}</button></th>
+              <th><button class="sort-button ${sortMeta.key === 'totalWeightKg' ? 'active' : ''}" data-sort="totalWeightKg">Carried weight ${sortMeta.key === 'totalWeightKg' ? (sortMeta.direction === 'asc' ? '↑' : '↓') : ''}</button></th>
+              <th><button class="sort-button ${sortMeta.key === 'limitKg' ? 'active' : ''}" data-sort="limitKg">Limit ${sortMeta.key === 'limitKg' ? (sortMeta.direction === 'asc' ? '↑' : '↓') : ''}</button></th>
+              <th><button class="sort-button ${sortMeta.key === 'deltaKg' ? 'active' : ''}" data-sort="deltaKg">Over/Under ${sortMeta.key === 'deltaKg' ? (sortMeta.direction === 'asc' ? '↑' : '↓') : ''}</button></th>
+              <th>Bar</th>
+              <th>Power 24h</th>
+              <th>Power mission</th>
+            </tr>
+          </thead>
           <tbody>
             ${operatorSummary.map((op) => {
               const weightTone = marginTone((state.constraints.maxWeightPerOperatorKg ? (state.constraints.maxWeightPerOperatorKg - op.totalWeightKg) / state.constraints.maxWeightPerOperatorKg : 0));
               const power24Tone = marginTone(op.coverage24 - 1);
               const powerMissionTone = marginTone(op.coverageMission - 1);
+              const barWidth = op.loadPct ? Math.min(100, op.loadPct) : 0;
               return `<tr class="${weightTone === 'red' ? 'status-row-red' : ''}">
-                <td>${op.operator}</td>
-                <td>${op.role}</td>
-                <td>${op.kits}</td>
+                <td>${op.operator}<div class="muted small-text">${op.role}</div></td>
                 <td>${op.totalWeightKg} kg</td>
-                <td><span class="status-chip ${weightTone}">${state.constraints.maxWeightPerOperatorKg ? `${Math.max(0, (state.constraints.maxWeightPerOperatorKg - op.totalWeightKg)).toFixed(1)} kg free` : 'N/A'}</span></td>
+                <td>${op.limitKg || '—'} kg</td>
+                <td><span class="status-chip ${weightTone}">${op.deltaKg !== null ? `${op.deltaKg.toFixed(1)} kg` : 'N/A'}</span></td>
+                <td><div class="load-bar"><div class="load-bar-fill ${op.overLimit ? 'over' : ''}" style="width:${barWidth}%;"></div><div class="load-bar-cap"></div></div></td>
                 <td><span class="status-chip ${power24Tone}">${(op.coverage24 * 100).toFixed(0)}% of need</span></td>
                 <td><span class="status-chip ${powerMissionTone}">${(op.coverageMission * 100).toFixed(0)}% of need</span></td>
               </tr>`;
@@ -1705,7 +1865,20 @@ function renderSummaryPanel() {
     </div>
   `;
 
+  renderMissionIntegrationPanel();
   renderMissionSnapshot();
+  renderExportPanel();
+}
+
+function handleOperatorSort(e) {
+  const btn = e.target.closest('.sort-button');
+  if (!btn) return;
+  const key = btn.dataset.sort;
+  if (!key) return;
+  const current = state.operatorSort || {};
+  const direction = current.key === key && current.direction === 'asc' ? 'desc' : 'asc';
+  state.operatorSort = { key, direction };
+  renderSummaryPanel();
   renderExportPanel();
 }
 
@@ -2178,7 +2351,7 @@ function handleCategoryClick(e) {
 }
 
 function handleNavScroll() {
-  const sections = ['constraints', 'inventory', 'kits', 'summary', 'packing-lists', 'export'].map((id) => document.getElementById(id));
+  const sections = ['constraints', 'inventory', 'kits', 'summary', 'mission-integration', 'packing-lists', 'export'].map((id) => document.getElementById(id));
   const scrollPos = document.documentElement.scrollTop || document.body.scrollTop;
   const offset = 120;
   let activeId = 'constraints';
@@ -2197,6 +2370,7 @@ function renderAll() {
   renderInventoryList();
   renderKitsPanel();
   renderSummaryPanel();
+  renderMissionIntegrationPanel();
   renderPackingListsView();
   handleNavScroll();
 }
@@ -2228,6 +2402,7 @@ function attachEvents() {
   document.getElementById('download-json').addEventListener('click', downloadJSON);
   document.getElementById('download-mission-project').addEventListener('click', downloadMissionProject);
   document.getElementById('download-atak').addEventListener('click', exportAtakMissionPackage);
+  elements.summaryContent.addEventListener('click', handleOperatorSort);
   elements.addOperatorBtn.addEventListener('click', () => addAssignment('Operator', ''));
   elements.printPackingBtn.addEventListener('click', () => window.print());
   elements.packingListsContent.addEventListener('input', handleAssignmentActions);

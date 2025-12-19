@@ -89,6 +89,7 @@ function normalizeProject(raw) {
   return {
     ...base,
     ...raw,
+    schemaVersion: raw.schemaVersion || raw.schema_version || base.schemaVersion,
     origin_tool: raw.origin_tool || 'kit',
     id: raw.id || base.id,
     name: raw.name || base.name,
@@ -133,7 +134,6 @@ function normalizeProject(raw) {
         ...asg,
       })),
     },
-    schemaVersion: KITSMITH_SCHEMA_VERSION,
   };
 }
 
